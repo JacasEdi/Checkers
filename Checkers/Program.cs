@@ -13,8 +13,8 @@ namespace Checkers
             var board = new Board();
             //PlayerVsPlayer(board);
             PlayerVsAI(board);
+            //AiVsAi(board);
         }
-
 
         public enum Square
         {
@@ -33,71 +33,411 @@ namespace Checkers
             CvC
         }
 
+        private static void AiVsAi(Board board)
+        {
+            Square currentPlayer = Square.Red;
+
+            // array lists for storing all subsequent states of the game and pointers to them
+            var states = new ArrayList();
+            var pointers = new ArrayList();
+
+            // add initial state of the game to the list
+            states.Add(new State(board.GetState(), currentPlayer));
+
+            // initialize pointer variable and add pointer to the initial state of the game to the list
+            var pointer = 0;
+            pointers.Add(pointer);
+
+            // continue the game as long as current player has any pieces left
+            while (board.GetPlayersPieces(currentPlayer).Any())
+            {
+                board.PrintBoard();
+
+                // get the list of pieces belonging to current player
+                var playersPieces = board.GetPlayersPieces(currentPlayer);
+                // get the list of legal non-jump moves that player can make
+                var legalMoves = board.GetLegalMoves(playersPieces);
+                // get the list of legal jumps that player can (have to) make
+                var legalJumps = board.GetLegalJumps(playersPieces);
+
+                // if current player has no jumps and no regular moves to make, he's lost
+                if (legalJumps.Count + legalMoves.Count == 0)
+                    break;
+
+                State state = new State(board.GetState(), currentPlayer);
+
+                Move bestMove;
+
+                // no jumps can be made by AI player, get it to choose best of its regular moves
+                if (!legalJumps.Any())
+                {
+                    bestMove = GetBestMove(board, state, 3, int.MinValue, int.MaxValue);
+                    board.MovePiece(bestMove);
+
+                    Console.WriteLine("AI moved from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                        bestMove.ToRow, bestMove.ToCol);
+                }
+                // AI player can jump, get it to choose best of its jumps
+                while (legalJumps.Any())
+                {
+                    bestMove = legalJumps.First();
+
+                    /*                        foreach (var piece in playersPieces)
+                                            {
+                                                Console.WriteLine("Piece [{0},{1}]", piece.X, piece.Y);
+                                            }
+                                            Console.WriteLine("BEST MOVE FOR JUMP: [{0},{1}]", bestMove.FromRow, bestMove.FromCol);*/
+
+                    Piece jumpingPiece =
+                        playersPieces.Find(piece => piece.X == bestMove.FromRow && piece.Y == bestMove.FromCol);
+                    bool kingBeforeJump = jumpingPiece.IsKing;
+
+                    board.DoJump(bestMove, jumpingPiece);
+
+                    // add new state to the list after jump has been made                                             
+                    var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
+                    states.Add(newState);
+
+                    // add pointer to the newly created state to the list of pointers
+                    pointer = states.IndexOf(newState);
+                    pointers.Add(pointer);
+
+                    // update variables of the piece that has just jumped
+                    jumpingPiece.HasJustJumped = true;
+                    jumpingPiece.X = bestMove.ToRow;
+                    jumpingPiece.Y = bestMove.ToCol;
+
+                    // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
+                    playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
+
+                    legalJumps = board.GetLegalJumps(playersPieces);
+
+                    // show the state of the board after first jump if another one can be made
+                    if (legalJumps.Any())
+                        board.PrintBoard();
+
+                    // update position of the jumping piece on the board
+                    board.UpdatePosition(jumpingPiece, bestMove.FromRow, bestMove.FromCol);
+
+                    // no further jumps can be made if piece became a king after the first jump
+                    if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
+                        break;
+
+                    Console.WriteLine("AI jumped from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                        bestMove.ToRow, bestMove.ToCol);
+                }
+
+                currentPlayer = ChangeTurn(currentPlayer);
+            }
+
+            // print the final state of the board once the game has ended
+            board.PrintBoard();
+            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
+        }
+
         private static void PlayerVsAI(Board board)
         {
             Square currentPlayer = Square.Red;
-            State state = new State(board.GetState(), ChangeTurn(currentPlayer));
 
-            double val = AlphaBeta(board, state, 3, Double.NegativeInfinity, Double.PositiveInfinity);
-            Console.WriteLine("Val: " + val);
+            // array lists for storing all subsequent states of the game and pointers to them
+            var states = new ArrayList();
+            var pointers = new ArrayList();
+
+            // add initial state of the game to the list
+            states.Add(new State(board.GetState(), currentPlayer));
+
+            // initialize pointer variable and add pointer to the initial state of the game to the list
+            var pointer = 0;
+            pointers.Add(pointer);
+
+            // continue the game as long as current player has any pieces left
+            while (board.GetPlayersPieces(currentPlayer).Any())
+            {
+                board.PrintBoard();
+
+                // get the list of pieces belonging to current player
+                var playersPieces = board.GetPlayersPieces(currentPlayer);
+                // get the list of legal non-jump moves that player can make
+                var legalMoves = board.GetLegalMoves(playersPieces);
+                // get the list of legal jumps that player can (have to) make
+                var legalJumps = board.GetLegalJumps(playersPieces);
+
+                // if current player has no jumps and no regular moves to make, he's lost
+                if (legalJumps.Count + legalMoves.Count == 0)
+                    break;
+
+                if (currentPlayer == Square.Red)
+                {
+                    Console.WriteLine("What would you like to do? Type 'Undo', 'Redo', or press enter to carry on");
+                    var choice = Console.ReadLine();
+
+                    if (choice.Equals("undo", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        //Console.WriteLine("Pointer: " + (pointer) + ", pointers[pointers.IndexOf(pointer)-1]: " + pointers[pointers.IndexOf(pointer)-1]);                    
+                        if (pointer > 0 && pointer - (int) pointers[pointers.IndexOf(pointer) - 1] == 1)
+                        {
+                            var previousState = (State) states[pointer - 1];
+                            Console.WriteLine("Restoring state #" + states.IndexOf(previousState));
+                            board.SetState(previousState.BoardState);
+
+                            currentPlayer = previousState.CurrentPlayer;
+
+                            pointer = states.IndexOf(previousState);
+                            pointers.Add(pointer);
+                        }
+                        else
+                        {
+                            Console.WriteLine("You can't go back any further");
+                        }
+                    }
+                    else if (choice.Equals("redo", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        if (pointer < states.Count - 1)
+                        {
+                            var redoState = (State) states[pointer + 1];
+                            board.SetState(redoState.BoardState);
+
+                            currentPlayer = redoState.CurrentPlayer;
+
+                            pointer = states.IndexOf(redoState);
+                            pointers.Add(pointer);
+                        }
+                        else
+                        {
+                            Console.WriteLine("There are no moves to redo");
+                        }
+                    }
+                    else
+                    {
+                        var move = RequestMove();
+
+                        // no jumps can be made so a regular move has to be made
+                        if (!legalJumps.Any())
+                        {
+                            while (!legalMoves.Contains(move))
+                            {
+                                Console.WriteLine(
+                                    "--------------------Please provide a legal move--------------------");
+                                move = RequestMove();
+                            }
+
+                            // move can be made as it's in the list of legal moves, perform it
+                            board.MovePiece(move);
+
+                            // add new state to the list after move has been performed    
+                            var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
+                            states.Add(newState);
+
+                            pointer = states.IndexOf(newState);
+                            pointers.Add(pointer);
+                        }
+
+                        // force the player to make a jump
+                        while (legalJumps.Any())
+                        {
+                            // see if player's move matches any of the possible jumps
+                            if (legalJumps.Contains(move))
+                            {
+                                // get reference to the piece that will be jumping
+                                Piece jumpingPiece = playersPieces.Find(piece =>
+                                    piece.X == move.FromRow && piece.Y == move.FromCol);
+                                bool kingBeforeJump = jumpingPiece.IsKing;
+
+                                board.DoJump(move, jumpingPiece);
+
+                                // add new state to the list after jump has been made                                             
+                                var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
+                                states.Add(newState);
+
+                                // add pointer to the newly created state to the list of pointers
+                                pointer = states.IndexOf(newState);
+                                pointers.Add(pointer);
+
+                                // update variables of the piece that has just jumped
+                                jumpingPiece.HasJustJumped = true;
+                                jumpingPiece.X = move.ToRow;
+                                jumpingPiece.Y = move.ToCol;
+
+                                // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
+                                playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
+
+                                legalJumps = board.GetLegalJumps(playersPieces);
+
+                                // update position of the jumping piece on the board
+                                board.UpdatePosition(jumpingPiece, move.FromRow, move.FromCol);
+
+                                // show the state of the board after first jump if another one can be made
+                                if (legalJumps.Any())
+                                    board.PrintBoard();
+
+                                // no further jumps can be made if piece became a king after the first jump
+                                if (!kingBeforeJump && move.ToRow == 0 | move.ToRow == 7)
+                                    break;
+                            }
+                            else
+                            {
+                                Console.WriteLine("--------------------You have to jump--------------------");
+                                move = RequestMove();
+                            }
+                        }
+
+                        // change turn
+                        currentPlayer = ChangeTurn(currentPlayer);
+                    }
+                }
+                else if (currentPlayer == Square.White)
+                {
+                    State state = new State(board.GetState(), currentPlayer);
+                    Move bestMove;
+
+                    // no jumps can be made by AI player, get it to choose best of its regular moves
+                    if (!legalJumps.Any())
+                    {
+                        bestMove = GetBestMove(board, state, 3, int.MinValue, int.MaxValue);
+                        board.MovePiece(bestMove);
+
+                        Console.WriteLine("AI moved from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                            bestMove.ToRow, bestMove.ToCol);
+                    }
+                    // AI player can jump, get it to choose best of its jumps
+                    while (legalJumps.Any())
+                    {
+                        bestMove = legalJumps.First();
+
+/*                        foreach (var piece in playersPieces)
+                        {
+                            Console.WriteLine("Piece [{0},{1}]", piece.X, piece.Y);
+                        }
+                        Console.WriteLine("BEST MOVE FOR JUMP: [{0},{1}]", bestMove.FromRow, bestMove.FromCol);*/
+
+                        Piece jumpingPiece = playersPieces.Find(piece =>
+                            piece.X == bestMove.FromRow && piece.Y == bestMove.FromCol);
+                        bool kingBeforeJump = jumpingPiece.IsKing;
+
+                        board.DoJump(bestMove, jumpingPiece);
+
+                        // add new state to the list after jump has been made                                             
+                        var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
+                        states.Add(newState);
+
+                        // add pointer to the newly created state to the list of pointers
+                        pointer = states.IndexOf(newState);
+                        pointers.Add(pointer);
+
+                        // update variables of the piece that has just jumped
+                        jumpingPiece.HasJustJumped = true;
+                        jumpingPiece.X = bestMove.ToRow;
+                        jumpingPiece.Y = bestMove.ToCol;
+
+                        // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
+                        playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
+
+                        legalJumps = board.GetLegalJumps(playersPieces);
+
+                        // show the state of the board after first jump if another one can be made
+                        if (legalJumps.Any())
+                            board.PrintBoard();
+
+                        // update position of the jumping piece on the board
+                        board.UpdatePosition(jumpingPiece, bestMove.FromRow, bestMove.FromCol);
+
+                        // no further jumps can be made if piece became a king after the first jump
+                        if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
+                            break;
+
+                        Console.WriteLine("AI jumped from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                            bestMove.ToRow, bestMove.ToCol);
+                    }
+
+                    currentPlayer = ChangeTurn(currentPlayer);
+                }
+            }
+
+            // print the final state of the board once the game has ended
+            board.PrintBoard();
+            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
         }
 
-           
-        private static double AlphaBeta(Board board, State state, int depth, double alpha, double beta)
+        private static Move GetBestMove(Board board, State state, int depth, int alpha, int beta)
         {
-            if (depth == 0)
-                return Evaluate(state);
-
             var playersPieces = board.GetPlayersPieces(state.CurrentPlayer);
-            var legalMoves = board.GetLegalMoves(playersPieces);
             var legalJumps = board.GetLegalJumps(playersPieces);
+            var legalMoves = legalJumps.Any() ? legalJumps : board.GetLegalMoves(playersPieces);
 
-            //this line could be rubbish
-            legalMoves.UnionWith(legalJumps);
+            var bestMoves = new List<Move>();
+
+            int highestScore = int.MinValue;
+            var rand = new Random();
+
+            //Console.WriteLine("{0}'s Moves:", state.CurrentPlayer);
+
+            foreach (Move move in legalMoves)
+            {
+                var boardAfterMove = board.DeepCopy();
+                boardAfterMove.MovePiece(move);
+
+                /*                if (move.IsJump && !move.IsCrowned && boardAfterMove.GetJumps(color).Any())
+                                    tmpScore = NegaMax(color, boardAfterMove, depth);
+                                  else*/
+
+                State newState = new State(boardAfterMove.GetState(), ChangeTurn(state.CurrentPlayer));
+
+                var tmpScore = -AlphaBeta(boardAfterMove, newState, depth - 1, -beta, -alpha);
+
+                //Console.WriteLine("{0}: {1}", move, tmpScore);
+
+                if (tmpScore > highestScore)
+                {
+                    bestMoves.Clear();
+                    bestMoves.Add(move);
+                    highestScore = tmpScore;
+                }
+                else if (tmpScore == highestScore)
+                {
+                    bestMoves.Add(move);
+                }
+            }
+
+            return bestMoves[rand.Next(bestMoves.Count)];
+        }
+
+        private static int AlphaBeta(Board board, State state, int depth, int alpha, int beta)
+        {
+            var playersPieces = board.GetPlayersPieces(state.CurrentPlayer);
+            var legalJumps = board.GetLegalJumps(playersPieces);
+            var legalMoves = legalJumps.Any() ? legalJumps : board.GetLegalMoves(playersPieces);
+
+            if (depth == 0 || !legalMoves.Any())
+                return Evaluate(state, legalMoves.Count);
 
             foreach (var move in legalMoves)
             {
-                var boardCopy = board.DeepCopy();
-                boardCopy.MovePiece(move);
+                var boardAfterMove = board.DeepCopy();
+                boardAfterMove.MovePiece(move);
 
-                State newState = new State(boardCopy.GetState(), ChangeTurn(state.CurrentPlayer));
-                // Unmake move here if I decide to not use a shallow copy but original board
+                State newState = new State(boardAfterMove.GetState(), ChangeTurn(state.CurrentPlayer));
+                // Unmake move here if I decide to not use a deep copy but original board
 
-                double val = -AlphaBeta(boardCopy, newState, depth - 1, -beta, -alpha);
+                int newScore = -AlphaBeta(boardAfterMove, newState, depth - 1, -beta, -alpha);
 
-                if (val >= beta)
+                if (newScore >= beta)
                     return beta;
-                if (val > alpha)
-                    alpha = val;
+                if (newScore > alpha)
+                    alpha = newScore;
             }
 
             return alpha;
         }
 
-        /*        
-       private float NegaMax(Board board, State state, int depth)
-       {
-           var playersPieces = board.GetPlayersPieces(state.CurrentPlayer);
-           var legalMoves = board.GetLegalMoves(playersPieces);
-           var legalJumps = board.GetLegalJumps(playersPieces);
-
-           foreach (var move in legalMoves)
-           {
-               var boardCopy = board.ShallowCopy();
-               boardCopy.MovePiece(move);
-
-               board.MovePiece(move);
-               State newState = new State(board.GetState(), ChangeTurn(state.CurrentPlayer));
-               float newValue = NegaMax(board, newState, depth + 1);
-           }
-       }*/
-
-        private static double Evaluate(State state)
+        private static int Evaluate(State state, int numOfMoves)
         {
-            double red = 0;
-            double white = 0;
+            int red = 0;
+            int white = 0;
             Square currentPlayer = state.CurrentPlayer;
             Square[,] board = state.BoardState;
+
+            if (numOfMoves == 0)
+                return -1000;
 
             for (var row = 0; row < 8; row++)
             {
@@ -108,18 +448,16 @@ namespace Checkers
                     if (board[row, col] == Square.White)
                         white++;
                     if (board[row, col] == Square.RedKing)
-                        red += 1.5;
+                        red += 2;
                     if (board[row, col] == Square.WhiteKing)
-                        white += 1.5;
+                        white += 2;
                 }
             }
 
             if (currentPlayer == Square.Red || currentPlayer == Square.RedKing)
                 return red - white;
-            else
-            {
-                return white - red;
-            }
+
+            return white - red;
         }
 
         private static void PlayerVsPlayer(Board board)
@@ -139,10 +477,9 @@ namespace Checkers
             pointers.Add(pointer);
 
             // continue the game as long as current player has any pieces left
-            while (board.GetPlayersPieces(currentPlayer).Count > 0)
+            while (board.GetPlayersPieces(currentPlayer).Any())
             {
                 Console.WriteLine("\nPlayer turn: {0}", currentPlayer);
-
 /*
                 Console.Write("Pointers list: ");
                 foreach (var point in pointers)
@@ -161,12 +498,14 @@ namespace Checkers
 
                 // get the list of pieces belonging to current player
                 var playersPieces = board.GetPlayersPieces(currentPlayer);
-
-                // get the list of legal non-jump moves that player can make
+                // get the list of legal moves that player can make which are not jumps
                 var legalMoves = board.GetLegalMoves(playersPieces);
-
                 // get the list of legal jumps that player can (have to) make
                 var legalJumps = board.GetLegalJumps(playersPieces);
+
+                // if current player has no jumps and no regular moves to make, he's lost
+                if (legalJumps.Count + legalMoves.Count == 0)
+                    break;
 
                 Console.WriteLine("What would you like to do? Type 'Undo', 'Redo', or press enter to carry on");
                 var choice = Console.ReadLine();
@@ -174,9 +513,9 @@ namespace Checkers
                 if (choice.Equals("undo", StringComparison.CurrentCultureIgnoreCase))
                 {
                     //Console.WriteLine("Pointer: " + (pointer) + ", pointers[pointers.IndexOf(pointer)-1]: " + pointers[pointers.IndexOf(pointer)-1]);                    
-                    if (pointer > 0 && pointer - (int)pointers[pointers.IndexOf(pointer) - 1] == 1)
+                    if (pointer > 0 && pointer - (int) pointers[pointers.IndexOf(pointer) - 1] == 1)
                     {
-                        var previousState = (State)states[pointer - 1];
+                        var previousState = (State) states[pointer - 1];
                         Console.WriteLine("Restoring state #" + states.IndexOf(previousState));
                         board.SetState(previousState.BoardState);
 
@@ -194,7 +533,7 @@ namespace Checkers
                 {
                     if (pointer < states.Count - 1)
                     {
-                        var redoState = (State)states[pointer + 1];
+                        var redoState = (State) states[pointer + 1];
                         board.SetState(redoState.BoardState);
 
                         currentPlayer = redoState.CurrentPlayer;
@@ -211,89 +550,15 @@ namespace Checkers
                 {
                     var move = RequestMove();
 
-                    // see if any jumps can be (have to be) made
-                    if (legalJumps.Count > 0)
+                    // no jumps can be made so a regular move has to be made
+                    if (!legalJumps.Any())
                     {
-                        // see if user's move matches any of the possible jumps
-                        if (legalJumps.Contains(move))
+                        while (!legalMoves.Contains(move))
                         {
-                            // jump is legal, perform it
-                            board.DoJump(move, false);
-
-                            // add new state to the list after jump has been made                                             
-                            var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                            states.Add(newState);
-
-                            // add pointer to the newly created state to the list of pointers
-                            pointer = states.IndexOf(newState);
-                            pointers.Add(pointer);
-
-                            // get reference to the piece that has just jumped                      
-                            Piece jumpingPiece = playersPieces.Find(piece => piece.X == move.FromRow && piece.Y == move.FromCol);
-
-                            // update state of the board before checking if another jump can be made by the same piece
-                            board.UpdateBoard(jumpingPiece, move.FromRow, move.FromCol);
-
-                            // update the x and y corrdinates of jumping piece and indicate that it's just jumped
-                            jumpingPiece.X = move.ToRow;
-                            jumpingPiece.Y = move.ToCol;
-                            jumpingPiece.HasJustJumped = true;
-
-                            // refresh the list of legal jumps to see if another jump can be made by the same piece                  
-                            legalJumps = board.GetLegalJumps(playersPieces);
-                            legalJumps.RemoveWhere(anotherMove => !anotherMove.CoordinateFrom.Equals(move.CoordinateTo));
-
-                            // if piece has not landed at the either end of the board, allow it to make multiple jump
-                            if (move.ToRow != 0 && move.ToRow != 7)
-                            {
-                                while (legalJumps.Count > 0)
-                                {
-                                    Console.WriteLine("Another jump can be made");
-
-                                    board.PrintBoard();
-
-                                    // force the user to enter a move that matches coordinates of the multiple jump
-                                    do
-                                    {
-                                        move = RequestMove();
-
-                                        if (!legalJumps.Contains(move))
-                                            Console.WriteLine("--------------------Please provide a legal jump--------------------");
-                                    } while (!legalJumps.Contains(move));
-
-                                    // make a jump and indicate that it's another jump in a sequence of multiple jumps
-                                    board.DoJump(move, true);
-
-                                    // add new state to the list after another jump has been performed                                              
-                                    var postJumpState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                                    states.Add(postJumpState);
-                                    pointer = states.IndexOf(postJumpState);
-                                    pointers.Add(pointer);
-                    
-                                    jumpingPiece = playersPieces.Find(piece => piece.X == move.FromRow && piece.Y == move.FromCol);
-
-                                    // update the x and y corrdinates of jumping piece and indicate that it's just jumped
-                                    jumpingPiece.X = move.ToRow;
-                                    jumpingPiece.Y = move.ToCol;
-                                    jumpingPiece.HasJustJumped = true;
-
-                                    board.UpdateBoard(jumpingPiece, move.FromRow, move.FromCol);
-
-                                    // refresh the list of legal jumps to see if another jump can be made by the same piece                    
-                                    legalJumps = board.GetLegalJumps(playersPieces);
-                                    legalJumps.RemoveWhere(anotherMove => !anotherMove.CoordinateFrom.Equals(move.CoordinateTo));
-                                }
-                            }                           
-                            currentPlayer = ChangeTurn(currentPlayer);
+                            Console.WriteLine("--------------------Please provide a legal move--------------------");
+                            move = RequestMove();
                         }
-                        else
-                        {
-                            Console.WriteLine("--------------------You have to jump--------------------");
-                        }
-                    }
-                    // otherwise force the user to perform any legal move and change turn
-                    else if (legalMoves.Contains(move))
-                    {
+
                         // move can be made as it's in the list of legal moves, perform it
                         board.MovePiece(move);
 
@@ -303,19 +568,65 @@ namespace Checkers
 
                         pointer = states.IndexOf(newState);
                         pointers.Add(pointer);
+                    }
 
-                        // change turn
-                        currentPlayer = ChangeTurn(currentPlayer);
-                    }
-                    else
+                    // force the player to make a jump
+                    while (legalJumps.Any())
                     {
-                        Console.WriteLine("--------------------Please provide a legal move--------------------");
+                        // see if player's move matches any of the possible jumps
+                        if (legalJumps.Contains(move))
+                        {
+                            // get reference to the piece that will be jumping
+                            Piece jumpingPiece = playersPieces.Find(piece =>
+                                piece.X == move.FromRow && piece.Y == move.FromCol);
+                            bool kingBeforeJump = jumpingPiece.IsKing;
+
+                            board.DoJump(move, jumpingPiece);
+
+                            // add new state to the list after jump has been made                                             
+                            var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
+                            states.Add(newState);
+
+                            // add pointer to the newly created state to the list of pointers
+                            pointer = states.IndexOf(newState);
+                            pointers.Add(pointer);
+
+                            // update variables of the piece that has just jumped
+                            jumpingPiece.HasJustJumped = true;
+                            jumpingPiece.X = move.ToRow;
+                            jumpingPiece.Y = move.ToCol;
+
+                            // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
+                            playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
+
+                            legalJumps = board.GetLegalJumps(playersPieces);
+
+                            // update position of the jumping piece on the board
+                            board.UpdatePosition(jumpingPiece, move.FromRow, move.FromCol);
+
+                            // show the state of the board after first jump if another one can be made
+                            if (legalJumps.Any())
+                                board.PrintBoard();
+
+                            // no further jumps can be made if piece became a king after the first jump
+                            if (!kingBeforeJump && move.ToRow == 0 | move.ToRow == 7)
+                                break;
+                        }
+                        else
+                        {
+                            Console.WriteLine("--------------------You have to jump--------------------");
+                            move = RequestMove();
+                        }
                     }
+
+                    // change turn
+                    currentPlayer = ChangeTurn(currentPlayer);
                 }
             }
 
+            // print the final state of the board once the game has ended
             board.PrintBoard();
-
+            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
         }
 
         private static Move RequestMove()
@@ -380,7 +691,7 @@ namespace Checkers
             /// </summary>
             public Board DeepCopy()
             {
-                Board other = (Board)this.MemberwiseClone();
+                Board other = (Board) this.MemberwiseClone();
                 other._board = _board.Clone() as Square[,];
                 return other;
             }
@@ -425,25 +736,17 @@ namespace Checkers
                 var fromCol = move.FromCol;
                 var toRow = move.ToRow;
                 var toCol = move.ToCol;
+                Square pieceType = _board[fromRow, fromCol];
 
                 // if move is more than 2 rows forwards/backwards, then it's illegal
                 if (toRow - fromRow > 2 || toRow - fromRow < -2)
-                {
                     Console.WriteLine("You can't move further than 2 rows");
-                }
-                // TODO this is probably allowing RedKing to make funny jumps
-                // if move requested is 2 rows away
-                /*                else if (toRow - fromRow == 2 || toRow - fromRow == -2)
-                                {
-                                    // player is attempting to jump, check if it's legal
-                                    CanJump(move);
-                                }*/
-                else //if (IsMovePermitted(move))
+                else
                 {
                     // if the piece has reached either first or last row, it becomes a king
-                    if (toRow == 0 || toRow == 7)
+                    if (toRow == 0 && pieceType == Square.Red || toRow == 7 && pieceType == Square.White)
                     {
-                        MakeKing(_board[fromRow, fromCol], toRow, toCol);
+                        SetKing(pieceType, toRow, toCol);
                         _board[fromRow, fromCol] = Square.EmptyDark;
                     }
                     else
@@ -452,15 +755,13 @@ namespace Checkers
                         _board[toRow, toCol] = _board[fromRow, fromCol];
                         _board[fromRow, fromCol] = Square.EmptyDark;
                     }
-
-                    Console.WriteLine("Move made");
                 }
             }
 
             /// <summary>
             /// Makes a regular red or white piece a king once it's reached the opposite end row of the board
             /// </summary>
-            private void MakeKing(Square currentPlayer, int rowTo, int colTo)
+            private void SetKing(Square currentPlayer, int rowTo, int colTo)
             {
                 if (currentPlayer == Square.Red && rowTo == 0)
                     _board[rowTo, colTo] = Square.RedKing;
@@ -525,7 +826,7 @@ namespace Checkers
             {
                 // looping through each row
                 for (var row = 0; row < Size; row++)
-                // looping through each column within the row
+                    // looping through each column within the row
                 for (var col = 0; col < Size; col++)
                     // if row is an even number
                     if (row % 2 == 0)
@@ -564,7 +865,7 @@ namespace Checkers
                         if (row == -1)
                             Console.Write("Y={0} ", col);
                         else
-                            switch ((int)_board[row, col])
+                            switch ((int) _board[row, col])
                             {
                                 case 0:
                                     Console.Write(" {0}  ", "-");
@@ -603,7 +904,7 @@ namespace Checkers
                     // if it's any of the first 3 rows and square is dark
                     if (row < 3 && _board[row, col] == Square.EmptyDark)
                         _board[row, col] = Square.White;
-                        
+
                     // if it's any of the last 3 rows and square is dark
                     if (row > 4 && _board[row, col] == Square.EmptyDark)
                         _board[row, col] = Square.Red;
@@ -654,7 +955,7 @@ namespace Checkers
                         // checking if a jump to the left can be made to the row below
                         if (GetPieceAt(new Point(toRow, toCol)) == Square.EmptyDark &&
                             (GetPieceAt(new Point(toRow + 1, toCol + 1)) == opponent ||
-                            GetPieceAt(new Point(toRow + 1, toCol + 1)) == opponentsKing))
+                             GetPieceAt(new Point(toRow + 1, toCol + 1)) == opponentsKing))
                             return true;
                         return false;
                     }
@@ -686,7 +987,7 @@ namespace Checkers
 
                 // king and regular piece that has just jumped can jump in all directions
                 if (currentPlayer == Square.RedKing || currentPlayer == Square.WhiteKing || piece.HasJustJumped)
-                {                   
+                {
                     // checking jumps to the right
                     if (colDirection == -2)
                     {
@@ -721,7 +1022,6 @@ namespace Checkers
                                 (GetPieceAt(new Point(toRow - 1, toCol + 1)) == opponent ||
                                  GetPieceAt(new Point(toRow - 1, toCol + 1)) == opponentsKing))
                             {
-                                Console.WriteLine("Kingus you can jump");
                                 return true;
                             }
                         }
@@ -733,7 +1033,6 @@ namespace Checkers
                                 (GetPieceAt(new Point(toRow + 1, toCol + 1)) == opponent ||
                                  GetPieceAt(new Point(toRow + 1, toCol + 1)) == opponentsKing))
                             {
-                                Console.WriteLine("Kingus you can jump LOL");
                                 return true;
                             }
                         }
@@ -748,7 +1047,7 @@ namespace Checkers
             /// <summary>
             /// Performs a jump. It is assumed that this jump is valid.
             /// </summary>
-            public void DoJump(Move move, bool isMultiple)
+            public void DoJump(Move move, Piece jumpingPiece)
             {
                 var toRow = move.ToRow;
                 var toCol = move.ToCol;
@@ -761,7 +1060,7 @@ namespace Checkers
                 // if row to jump to is at either end of the board, a regular piece becomes a king
                 if (toRow == 0 || toRow == 7)
                 {
-                    MakeKing(_board[fromRow, fromCol], toRow, toCol);
+                    SetKing(_board[fromRow, fromCol], toRow, toCol);
                     becameKing = true;
                     Console.WriteLine("KING SET AFTER JUMP");
                 }
@@ -772,7 +1071,7 @@ namespace Checkers
                     // jumping to the right
                     if (directionCol == -2)
                     {
-                        if(becameKing)
+                        if (becameKing)
                             _board[toRow, toCol] = Square.RedKing;
                         else
                             _board[toRow, toCol] = Square.Red;
@@ -821,7 +1120,8 @@ namespace Checkers
                 }
 
                 // perform a jump using either RedKing, WhiteKing or a regular piece that is making another jump in a sequence
-                if (_board[fromRow, fromCol] == Square.WhiteKing || _board[fromRow, fromCol] == Square.RedKing || isMultiple)
+                if (_board[fromRow, fromCol] == Square.WhiteKing || _board[fromRow, fromCol] == Square.RedKing ||
+                    jumpingPiece.HasJustJumped)
                 {
                     // jumping to the row below
                     if (directionRow == 2)
@@ -888,13 +1188,13 @@ namespace Checkers
             /// <summary>
             /// Updates the position on the board of the provided piece
             /// </summary>
-            public void UpdateBoard(Piece piece, int rowFrom, int colFrom)
+            public void UpdatePosition(Piece piece, int rowFrom, int colFrom)
             {
                 _board[piece.X, piece.Y] = piece.Type;
                 _board[rowFrom, colFrom] = Square.EmptyDark;
 
-                if(piece.X == 0 || piece.X == 7)
-                    MakeKing(piece.Type, piece.X, piece.Y);
+                if (piece.X == 0 || piece.X == 7)
+                    SetKing(piece.Type, piece.X, piece.Y);
             }
 
             /// <summary>
@@ -933,7 +1233,7 @@ namespace Checkers
                             legalJumps.Add(new Move(rowFrom, colFrom, rowFrom + 2, colFrom - 2));
                     }
 
-                    // all 4 possible directions of a jump have to be checked for a king or a regular piece that hust jumped
+                    // all 4 possible directions of a jump have to be checked for a king or a regular piece that has just jumped
                     if (pieceType == Square.RedKing || pieceType == Square.WhiteKing || piece.HasJustJumped)
                     {
                         // check if jump to the row below to the right can be made
@@ -946,18 +1246,18 @@ namespace Checkers
                         if (CanJump(piece, new Move(rowFrom, colFrom, rowFrom + 2, colFrom + 2)))
                             legalJumps.Add(new Move(rowFrom, colFrom, rowFrom + 2, colFrom + 2));
                         // check if jump to the row above to the left can be made
-                        if (CanJump(piece, new Move(rowFrom, colFrom, rowFrom + 2, colFrom - 2)))                       
-                            legalJumps.Add(new Move(rowFrom, colFrom, rowFrom + 2, colFrom - 2));                        
+                        if (CanJump(piece, new Move(rowFrom, colFrom, rowFrom + 2, colFrom - 2)))
+                            legalJumps.Add(new Move(rowFrom, colFrom, rowFrom + 2, colFrom - 2));
                     }
                 }
 
-                Console.WriteLine("Legal jumps: ");
+/*                Console.WriteLine("Legal jumps: ");
                 foreach (var move in legalJumps)
                 {
                     Console.Write("From: {0}  To: {1}", move.CoordinateFrom, move.CoordinateTo);
                     Console.WriteLine();
                 }
-                Console.WriteLine();
+                Console.WriteLine();*/
 
                 return legalJumps;
             }
@@ -980,7 +1280,7 @@ namespace Checkers
 
                     // each piece can go in up to 7 directions from where it stands
                     for (var i = -1; i < 7; i++)
-                    // checking if it can move to any of the 3 squares directly below itself
+                        // checking if it can move to any of the 3 squares directly below itself
                         if (i < 2)
                         {
                             if (IsMovePermitted(pieceType, new Move(rowFrom, colFrom, rowFrom - 1, colFrom + i)))
@@ -1006,13 +1306,13 @@ namespace Checkers
                         }
                 }
 
-                Console.WriteLine("Legal moves: ");
+/*                Console.WriteLine("Legal moves: ");
                 foreach (var move in legalMoves)
                 {
                     Console.Write("From: {0},{1}  To: {2},{3}", move.FromRow, move.FromCol, move.ToRow, move.ToCol);
                     Console.WriteLine();
                 }
-                Console.WriteLine();
+                Console.WriteLine();*/
 
                 return legalMoves;
             }
@@ -1035,7 +1335,6 @@ namespace Checkers
                     return Square.EmptyLight;
                 }
             }
-
         }
 
         /// <summary>
@@ -1043,36 +1342,18 @@ namespace Checkers
         /// </summary>
         private class Move
         {
-            private int fromRow;
-            private int fromCol;
-            private int toRow;
-            private int toCol;
             private Point coordinatesFrom;
             private Point coordinatesTo;
 
-            public int FromRow
-            {
-                get => fromRow;
-                set => fromRow = value;
-            }
+            public bool IsJump { get; set; }
 
-            public int FromCol
-            {
-                get => fromCol;
-                set => fromCol = value;
-            }
+            public int FromRow { get; set; }
 
-            public int ToRow
-            {
-                get => toRow;
-                set => toRow = value;
-            }
+            public int FromCol { get; set; }
 
-            public int ToCol
-            {
-                get => toCol;
-                set => toCol = value;
-            }
+            public int ToRow { get; set; }
+
+            public int ToCol { get; set; }
 
             public Point CoordinateFrom
             {
@@ -1088,18 +1369,21 @@ namespace Checkers
 
             public Move(int fromRow, int fromCol, int toRow, int toCol)
             {
-                this.fromRow = fromRow;
-                this.fromCol = fromCol;
-                this.toRow = toRow;
-                this.toCol = toCol;
+                this.FromRow = fromRow;
+                this.FromCol = fromCol;
+                this.ToRow = toRow;
+                this.ToCol = toCol;
                 coordinatesFrom = new Point(fromRow, fromCol);
                 coordinatesTo = new Point(toRow, toCol);
+
+                if (ToRow - fromRow == 2 || toRow - FromRow == -2)
+                    IsJump = true;
             }
 
             protected bool Equals(Move other)
             {
-                return fromRow == other.fromRow && fromCol == other.fromCol &&
-                       toRow == other.toRow && toCol == other.toCol && coordinatesFrom.Equals(other.coordinatesFrom) &&
+                return FromRow == other.FromRow && FromCol == other.FromCol &&
+                       ToRow == other.ToRow && ToCol == other.ToCol && coordinatesFrom.Equals(other.coordinatesFrom) &&
                        coordinatesTo.Equals(other.coordinatesTo);
             }
 
@@ -1108,17 +1392,17 @@ namespace Checkers
                 if (ReferenceEquals(null, obj)) return false;
                 if (ReferenceEquals(this, obj)) return true;
                 if (obj.GetType() != GetType()) return false;
-                return Equals((Move)obj);
+                return Equals((Move) obj);
             }
 
             public override int GetHashCode()
             {
                 unchecked
                 {
-                    var hashCode = fromRow;
-                    hashCode = (hashCode * 397) ^ fromCol;
-                    hashCode = (hashCode * 397) ^ toRow;
-                    hashCode = (hashCode * 397) ^ toCol;
+                    var hashCode = FromRow;
+                    hashCode = (hashCode * 397) ^ FromCol;
+                    hashCode = (hashCode * 397) ^ ToRow;
+                    hashCode = (hashCode * 397) ^ ToCol;
                     hashCode = (hashCode * 397) ^ coordinatesFrom.GetHashCode();
                     hashCode = (hashCode * 397) ^ coordinatesTo.GetHashCode();
                     return hashCode;
