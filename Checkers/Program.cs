@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -11,9 +10,32 @@ namespace Checkers
         private static void Main(string[] args)
         {
             var board = new Board();
-            //PlayerVsPlayer(board);
-            PlayerVsAI(board);
-            //AiVsAi(board);
+
+            Console.WriteLine("Choose the game mode");
+            Console.WriteLine("1 - Human vs Human");
+            Console.WriteLine("2 - Human vs AI");
+            Console.WriteLine("3 - AI vs AI");
+
+            var choice = Console.ReadLine();
+
+            while (!int.TryParse(choice, out int val) || val > 3 || val < 1)
+            {
+                Console.WriteLine("Please provide a valid option");
+                choice = Console.ReadLine();
+            }
+
+            switch (Int32.Parse(choice))
+            {
+                case 1:
+                    HumanVsHuman(board);
+                    break;
+                case 2:
+                    HumanVsAi(board);
+                    break;
+                case 3:
+                    AiVsAi(board);
+                    break;
+            }
         }
 
         public enum Square
@@ -26,338 +48,6 @@ namespace Checkers
             WhiteKing
         }
 
-        public enum GameType
-        {
-            PvP,
-            PvC,
-            CvC
-        }
-
-        private static void AiVsAi(Board board)
-        {
-            Square currentPlayer = Square.Red;
-
-            // array lists for storing all subsequent states of the game and pointers to them
-            var states = new ArrayList();
-            var pointers = new ArrayList();
-
-            // add initial state of the game to the list
-            states.Add(new State(board.GetState(), currentPlayer));
-
-            // initialize pointer variable and add pointer to the initial state of the game to the list
-            var pointer = 0;
-            pointers.Add(pointer);
-
-            // continue the game as long as current player has any pieces left
-            while (board.GetPlayersPieces(currentPlayer).Any())
-            {
-                board.PrintBoard();
-
-                // get the list of pieces belonging to current player
-                var playersPieces = board.GetPlayersPieces(currentPlayer);
-                // get the list of legal non-jump moves that player can make
-                var legalMoves = board.GetLegalMoves(playersPieces);
-                // get the list of legal jumps that player can (have to) make
-                var legalJumps = board.GetLegalJumps(playersPieces);
-
-                // if current player has no jumps and no regular moves to make, he's lost
-                if (legalJumps.Count + legalMoves.Count == 0)
-                    break;
-
-                State state = new State(board.GetState(), currentPlayer);
-
-                Move bestMove;
-
-                // no jumps can be made by AI player, get it to choose best of its regular moves
-                if (!legalJumps.Any())
-                {
-                    bestMove = GetBestMove(board, state, 3, int.MinValue, int.MaxValue);
-                    board.MovePiece(bestMove);
-
-                    Console.WriteLine("AI moved from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
-                        bestMove.ToRow, bestMove.ToCol);
-                }
-                // AI player can jump, get it to choose best of its jumps
-                while (legalJumps.Any())
-                {
-                    bestMove = legalJumps.First();
-
-                    /*                        foreach (var piece in playersPieces)
-                                            {
-                                                Console.WriteLine("Piece [{0},{1}]", piece.X, piece.Y);
-                                            }
-                                            Console.WriteLine("BEST MOVE FOR JUMP: [{0},{1}]", bestMove.FromRow, bestMove.FromCol);*/
-
-                    Piece jumpingPiece =
-                        playersPieces.Find(piece => piece.X == bestMove.FromRow && piece.Y == bestMove.FromCol);
-                    bool kingBeforeJump = jumpingPiece.IsKing;
-
-                    board.DoJump(bestMove, jumpingPiece);
-
-                    // add new state to the list after jump has been made                                             
-                    var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                    states.Add(newState);
-
-                    // add pointer to the newly created state to the list of pointers
-                    pointer = states.IndexOf(newState);
-                    pointers.Add(pointer);
-
-                    // update variables of the piece that has just jumped
-                    jumpingPiece.HasJustJumped = true;
-                    jumpingPiece.X = bestMove.ToRow;
-                    jumpingPiece.Y = bestMove.ToCol;
-
-                    // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
-                    playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
-
-                    legalJumps = board.GetLegalJumps(playersPieces);
-
-                    // show the state of the board after first jump if another one can be made
-                    if (legalJumps.Any())
-                        board.PrintBoard();
-
-                    // update position of the jumping piece on the board
-                    board.UpdatePosition(jumpingPiece, bestMove.FromRow, bestMove.FromCol);
-
-                    // no further jumps can be made if piece became a king after the first jump
-                    if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
-                        break;
-
-                    Console.WriteLine("AI jumped from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
-                        bestMove.ToRow, bestMove.ToCol);
-                }
-
-                currentPlayer = ChangeTurn(currentPlayer);
-            }
-
-            // print the final state of the board once the game has ended
-            board.PrintBoard();
-            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
-        }
-
-        private static void PlayerVsAI(Board board)
-        {
-            Square currentPlayer = Square.Red;
-
-            // array lists for storing all subsequent states of the game and pointers to them
-            var states = new ArrayList();
-            var pointers = new ArrayList();
-
-            // add initial state of the game to the list
-            states.Add(new State(board.GetState(), currentPlayer));
-
-            // initialize pointer variable and add pointer to the initial state of the game to the list
-            var pointer = 0;
-            pointers.Add(pointer);
-
-            // continue the game as long as current player has any pieces left
-            while (board.GetPlayersPieces(currentPlayer).Any())
-            {
-                board.PrintBoard();
-
-                // get the list of pieces belonging to current player
-                var playersPieces = board.GetPlayersPieces(currentPlayer);
-                // get the list of legal non-jump moves that player can make
-                var legalMoves = board.GetLegalMoves(playersPieces);
-                // get the list of legal jumps that player can (have to) make
-                var legalJumps = board.GetLegalJumps(playersPieces);
-
-                // if current player has no jumps and no regular moves to make, he's lost
-                if (legalJumps.Count + legalMoves.Count == 0)
-                    break;
-
-                if (currentPlayer == Square.Red)
-                {
-                    Console.WriteLine("What would you like to do? Type 'Undo', 'Redo', or press enter to carry on");
-                    var choice = Console.ReadLine();
-
-                    if (choice.Equals("undo", StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        //Console.WriteLine("Pointer: " + (pointer) + ", pointers[pointers.IndexOf(pointer)-1]: " + pointers[pointers.IndexOf(pointer)-1]);                    
-                        if (pointer > 0 && pointer - (int) pointers[pointers.IndexOf(pointer) - 1] == 1)
-                        {
-                            var previousState = (State) states[pointer - 1];
-                            Console.WriteLine("Restoring state #" + states.IndexOf(previousState));
-                            board.SetState(previousState.BoardState);
-
-                            currentPlayer = previousState.CurrentPlayer;
-
-                            pointer = states.IndexOf(previousState);
-                            pointers.Add(pointer);
-                        }
-                        else
-                        {
-                            Console.WriteLine("You can't go back any further");
-                        }
-                    }
-                    else if (choice.Equals("redo", StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        if (pointer < states.Count - 1)
-                        {
-                            var redoState = (State) states[pointer + 1];
-                            board.SetState(redoState.BoardState);
-
-                            currentPlayer = redoState.CurrentPlayer;
-
-                            pointer = states.IndexOf(redoState);
-                            pointers.Add(pointer);
-                        }
-                        else
-                        {
-                            Console.WriteLine("There are no moves to redo");
-                        }
-                    }
-                    else
-                    {
-                        var move = RequestMove();
-
-                        // no jumps can be made so a regular move has to be made
-                        if (!legalJumps.Any())
-                        {
-                            while (!legalMoves.Contains(move))
-                            {
-                                Console.WriteLine(
-                                    "--------------------Please provide a legal move--------------------");
-                                move = RequestMove();
-                            }
-
-                            // move can be made as it's in the list of legal moves, perform it
-                            board.MovePiece(move);
-
-                            // add new state to the list after move has been performed    
-                            var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                            states.Add(newState);
-
-                            pointer = states.IndexOf(newState);
-                            pointers.Add(pointer);
-                        }
-
-                        // force the player to make a jump
-                        while (legalJumps.Any())
-                        {
-                            // see if player's move matches any of the possible jumps
-                            if (legalJumps.Contains(move))
-                            {
-                                // get reference to the piece that will be jumping
-                                Piece jumpingPiece = playersPieces.Find(piece =>
-                                    piece.X == move.FromRow && piece.Y == move.FromCol);
-                                bool kingBeforeJump = jumpingPiece.IsKing;
-
-                                board.DoJump(move, jumpingPiece);
-
-                                // add new state to the list after jump has been made                                             
-                                var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                                states.Add(newState);
-
-                                // add pointer to the newly created state to the list of pointers
-                                pointer = states.IndexOf(newState);
-                                pointers.Add(pointer);
-
-                                // update variables of the piece that has just jumped
-                                jumpingPiece.HasJustJumped = true;
-                                jumpingPiece.X = move.ToRow;
-                                jumpingPiece.Y = move.ToCol;
-
-                                // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
-                                playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
-
-                                legalJumps = board.GetLegalJumps(playersPieces);
-
-                                // update position of the jumping piece on the board
-                                board.UpdatePosition(jumpingPiece, move.FromRow, move.FromCol);
-
-                                // show the state of the board after first jump if another one can be made
-                                if (legalJumps.Any())
-                                    board.PrintBoard();
-
-                                // no further jumps can be made if piece became a king after the first jump
-                                if (!kingBeforeJump && move.ToRow == 0 | move.ToRow == 7)
-                                    break;
-                            }
-                            else
-                            {
-                                Console.WriteLine("--------------------You have to jump--------------------");
-                                move = RequestMove();
-                            }
-                        }
-
-                        // change turn
-                        currentPlayer = ChangeTurn(currentPlayer);
-                    }
-                }
-                else if (currentPlayer == Square.White)
-                {
-                    State state = new State(board.GetState(), currentPlayer);
-                    Move bestMove;
-
-                    // no jumps can be made by AI player, get it to choose best of its regular moves
-                    if (!legalJumps.Any())
-                    {
-                        bestMove = GetBestMove(board, state, 3, int.MinValue, int.MaxValue);
-                        board.MovePiece(bestMove);
-
-                        Console.WriteLine("AI moved from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
-                            bestMove.ToRow, bestMove.ToCol);
-                    }
-                    // AI player can jump, get it to choose best of its jumps
-                    while (legalJumps.Any())
-                    {
-                        bestMove = legalJumps.First();
-
-/*                        foreach (var piece in playersPieces)
-                        {
-                            Console.WriteLine("Piece [{0},{1}]", piece.X, piece.Y);
-                        }
-                        Console.WriteLine("BEST MOVE FOR JUMP: [{0},{1}]", bestMove.FromRow, bestMove.FromCol);*/
-
-                        Piece jumpingPiece = playersPieces.Find(piece =>
-                            piece.X == bestMove.FromRow && piece.Y == bestMove.FromCol);
-                        bool kingBeforeJump = jumpingPiece.IsKing;
-
-                        board.DoJump(bestMove, jumpingPiece);
-
-                        // add new state to the list after jump has been made                                             
-                        var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                        states.Add(newState);
-
-                        // add pointer to the newly created state to the list of pointers
-                        pointer = states.IndexOf(newState);
-                        pointers.Add(pointer);
-
-                        // update variables of the piece that has just jumped
-                        jumpingPiece.HasJustJumped = true;
-                        jumpingPiece.X = bestMove.ToRow;
-                        jumpingPiece.Y = bestMove.ToCol;
-
-                        // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
-                        playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
-
-                        legalJumps = board.GetLegalJumps(playersPieces);
-
-                        // show the state of the board after first jump if another one can be made
-                        if (legalJumps.Any())
-                            board.PrintBoard();
-
-                        // update position of the jumping piece on the board
-                        board.UpdatePosition(jumpingPiece, bestMove.FromRow, bestMove.FromCol);
-
-                        // no further jumps can be made if piece became a king after the first jump
-                        if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
-                            break;
-
-                        Console.WriteLine("AI jumped from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
-                            bestMove.ToRow, bestMove.ToCol);
-                    }
-
-                    currentPlayer = ChangeTurn(currentPlayer);
-                }
-            }
-
-            // print the final state of the board once the game has ended
-            board.PrintBoard();
-            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
-        }
-
         private static Move GetBestMove(Board board, State state, int depth, int alpha, int beta)
         {
             var playersPieces = board.GetPlayersPieces(state.CurrentPlayer);
@@ -368,8 +58,6 @@ namespace Checkers
 
             int highestScore = int.MinValue;
             var rand = new Random();
-
-            //Console.WriteLine("{0}'s Moves:", state.CurrentPlayer);
 
             foreach (Move move in legalMoves)
             {
@@ -398,6 +86,7 @@ namespace Checkers
                 }
             }
 
+            //Console.WriteLine("Best moves count: " + bestMoves.Count);
             return bestMoves[rand.Next(bestMoves.Count)];
         }
 
@@ -416,9 +105,9 @@ namespace Checkers
                 boardAfterMove.MovePiece(move);
 
                 State newState = new State(boardAfterMove.GetState(), ChangeTurn(state.CurrentPlayer));
-                // Unmake move here if I decide to not use a deep copy but original board
 
                 int newScore = -AlphaBeta(boardAfterMove, newState, depth - 1, -beta, -alpha);
+                //Console.WriteLine("NEW SCORE " + newScore);
 
                 if (newScore >= beta)
                     return beta;
@@ -460,40 +149,330 @@ namespace Checkers
             return white - red;
         }
 
-        private static void PlayerVsPlayer(Board board)
+        private static void AiVsAi(Board board)
+        {
+            Square currentPlayer = Square.Red;
+
+            // array lists for storing all subsequent states of the game and pointers to them
+            List<State> states = new List<State>();
+
+            // add initial state of the game to the list
+            State firstState = new State(board.GetState(), currentPlayer);
+            states.Add(firstState);
+
+            // continue the game as long as current player has any pieces left
+            while (board.GetPlayersPieces(currentPlayer).Any())
+            {
+                board.PrintBoard();
+
+                // get the list of pieces belonging to current player
+                var playersPieces = board.GetPlayersPieces(currentPlayer);
+                // get the list of legal non-jump moves that player can make
+                var legalMoves = board.GetLegalMoves(playersPieces);
+                // get the list of legal jumps that player can (have to) make
+                var legalJumps = board.GetLegalJumps(playersPieces);
+
+                // if current player has no jumps and no regular moves to make, he's lost
+                if (legalJumps.Count + legalMoves.Count == 0)
+                    break;
+
+                State state = new State(board.GetState(), currentPlayer);
+
+                Move bestMove;
+
+                // no jumps can be made by AI player, get it to choose best of its regular moves
+                if (!legalJumps.Any())
+                {
+                    bestMove = GetBestMove(board, state, 3, int.MinValue, int.MaxValue);
+                    board.MovePiece(bestMove);
+
+                    Console.WriteLine("AI moved from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                        bestMove.ToRow, bestMove.ToCol);
+                }
+                // AI player can jump, get it to choose best of its jumps
+                while (legalJumps.Any())
+                {
+                    bestMove = legalJumps.First();
+
+                    Piece jumpingPiece =
+                        playersPieces.Find(piece => piece.X == bestMove.FromRow && piece.Y == bestMove.FromCol);
+                    bool kingBeforeJump = jumpingPiece.IsKing;
+
+                    board.DoJump(bestMove, jumpingPiece);
+
+                    // update variables of the piece that has just jumped
+                    jumpingPiece.HasJustJumped = true;
+                    jumpingPiece.X = bestMove.ToRow;
+                    jumpingPiece.Y = bestMove.ToCol;
+
+                    // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
+                    playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
+
+                    legalJumps = board.GetLegalJumps(playersPieces);
+
+                    // show the state of the board after first jump if another one can be made
+                    if (legalJumps.Any())
+                        board.PrintBoard();
+
+                    // update position of the jumping piece on the board
+                    board.UpdatePosition(jumpingPiece, bestMove.FromRow, bestMove.FromCol);
+
+                    // no further jumps can be made if piece became a king after the first jump
+                    if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
+                        break;
+
+                    Console.WriteLine("AI jumped from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                        bestMove.ToRow, bestMove.ToCol);
+                }
+
+                currentPlayer = ChangeTurn(currentPlayer);
+
+                // add new state to the list after move has been performed    
+                var newState = new State(board.GetState(), currentPlayer);
+                states.Add(newState);
+            }
+
+            // print the final state of the board once the game has ended
+            board.PrintBoard();
+            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
+        }
+
+        private static void HumanVsAi(Board board)
+        {
+            Square currentPlayer = Square.Red;
+
+            // list for storing all subsequent states of the game
+            List<State> states = new List<State>();
+
+            // add initial state of the game to the list
+            State firstState = new State(board.GetState(), currentPlayer);
+            states.Add(firstState);
+
+            // initialize pointer variable and point it to the initial state of the game
+            int pointer = 0;
+
+            // continue the game as long as current player has any pieces left
+            while (board.GetPlayersPieces(currentPlayer).Any())
+            {            
+                board.PrintBoard();
+
+                // get the list of pieces belonging to current player
+                var playersPieces = board.GetPlayersPieces(currentPlayer);
+                // get the list of legal non-jump moves that player can make
+                var legalMoves = board.GetLegalMoves(playersPieces);
+                // get the list of legal jumps that player can (have to) make
+                var legalJumps = board.GetLegalJumps(playersPieces);
+
+                // if current player has no jumps and no regular moves to make, he's lost
+                if (legalJumps.Count + legalMoves.Count == 0)
+                    break;
+
+                if (currentPlayer == Square.Red)
+                {
+                    Console.WriteLine("What would you like to do? Type 'Undo', 'Redo', or press enter to carry on");
+                    var choice = Console.ReadLine();
+
+                    if (choice.Equals("undo", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        if (pointer > 0)
+                        {
+                            pointer-=2;
+                            State previousState = states[pointer].DeepCopy();
+
+                            Console.WriteLine("RESTORED STATE: " + pointer);
+
+                            board.SetState(previousState.BoardState);
+                            currentPlayer = previousState.CurrentPlayer;
+                        }
+                        else
+                        {
+                            Console.WriteLine("You can't go back any further");
+                        }
+                    }
+                    else if (choice.Equals("redo", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        if (pointer < states.Count - 1)
+                        {
+                            pointer+=2;
+                            State redoState = states[pointer].DeepCopy();
+
+                            Console.WriteLine("RESTORED STATE: " + pointer);
+
+                            board.SetState(redoState.BoardState);
+                            currentPlayer = redoState.CurrentPlayer;
+                        }
+                        else
+                        {
+                            Console.WriteLine("There are no moves to redo");
+                        }
+                    }
+                    else
+                    {
+                        var move = RequestMove();
+
+                        // no jumps can be made so a regular move has to be made
+                        if (!legalJumps.Any())
+                        {
+                            while (!legalMoves.Contains(move))
+                            {
+                                Console.WriteLine("--------------------Please provide a legal move--------------------");
+                                move = RequestMove();
+                            }
+
+                            // move can be made as it's in the list of legal moves, perform it
+                            board.MovePiece(move);
+                        }
+
+                        // force the player to make a jump
+                        while (legalJumps.Any())
+                        {
+                            // see if player's move matches any of the possible jumps
+                            if (legalJumps.Contains(move))
+                            {
+                                // get reference to the piece that will be jumping
+                                Piece jumpingPiece = playersPieces.Find(piece =>
+                                    piece.X == move.FromRow && piece.Y == move.FromCol);
+                                bool kingBeforeJump = jumpingPiece.IsKing;
+
+                                board.DoJump(move, jumpingPiece);
+
+                                // update variables of the piece that has just jumped
+                                jumpingPiece.HasJustJumped = true;
+                                jumpingPiece.X = move.ToRow;
+                                jumpingPiece.Y = move.ToCol;
+
+                                // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
+                                playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
+
+                                legalJumps = board.GetLegalJumps(playersPieces);
+
+                                // update position of the jumping piece on the board
+                                board.UpdatePosition(jumpingPiece, move.FromRow, move.FromCol);
+
+                                // show the state of the board after first jump if another one can be made
+                                if (legalJumps.Any())
+                                    board.PrintBoard();
+
+                                // no further jumps can be made if piece became a king after the first jump
+                                if (!kingBeforeJump && move.ToRow == 0 | move.ToRow == 7)
+                                    break;
+                            }
+                            else
+                            {
+                                Console.WriteLine("--------------------You have to jump--------------------");
+                                move = RequestMove();
+                            }
+                        }
+
+                        // change turn
+                        currentPlayer = ChangeTurn(currentPlayer);
+
+                        // create new state of the game after move was made
+                        State newState = new State(board.GetState(), currentPlayer);
+
+                        // move was made after performing undo operation since pointer is not pointing to the last state
+                        if (pointer < states.Count - 1)
+                            // newState now becomes the last state, remove all states that happened after it
+                            states.RemoveAll(other => states.IndexOf(other) > pointer);
+
+                        states.Add(newState);
+
+                        // set pointer to the new state   
+                        pointer = states.IndexOf(newState);
+                    }
+                }
+                else if (currentPlayer == Square.White)
+                {
+                    State state = new State(board.GetState(), currentPlayer);
+                    Move bestMove;
+
+                    // no jumps can be made by AI player, get it to choose best of its regular moves
+                    if (!legalJumps.Any())
+                    {
+                        bestMove = GetBestMove(board, state, 3, int.MinValue, int.MaxValue);
+                        board.MovePiece(bestMove);
+
+                        Console.WriteLine("AI moved from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                            bestMove.ToRow, bestMove.ToCol);
+                    }
+                    // AI player can jump, get it to choose best of its jumps
+                    while (legalJumps.Any())
+                    {
+                        bestMove = legalJumps.First();
+
+                        Piece jumpingPiece = playersPieces.Find(piece =>
+                            piece.X == bestMove.FromRow && piece.Y == bestMove.FromCol);
+                        bool kingBeforeJump = jumpingPiece.IsKing;
+
+                        board.DoJump(bestMove, jumpingPiece);
+
+                        // update variables of the piece that has just jumped
+                        jumpingPiece.HasJustJumped = true;
+                        jumpingPiece.X = bestMove.ToRow;
+                        jumpingPiece.Y = bestMove.ToCol;
+
+                        // all pieces other than the one that has just jumped are irrelevant when checking if more jumps can be made
+                        playersPieces.RemoveAll(piece => piece.HasJustJumped == false);
+
+                        legalJumps = board.GetLegalJumps(playersPieces);
+
+                        // show the state of the board after first jump if another one can be made
+                        if (legalJumps.Any())
+                            board.PrintBoard();
+
+                        // update position of the jumping piece on the board
+                        board.UpdatePosition(jumpingPiece, bestMove.FromRow, bestMove.FromCol);
+
+                        // no further jumps can be made if piece became a king after the first jump
+                        if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
+                            break;
+
+                        Console.WriteLine("AI jumped from [{0},{1}] to [{2},{3}]", bestMove.FromRow, bestMove.FromCol,
+                            bestMove.ToRow, bestMove.ToCol);
+                    }
+
+                    currentPlayer = ChangeTurn(currentPlayer);
+
+                    // create new state of the game after move was made
+                    State newState = new State(board.GetState(), currentPlayer);
+
+                    // move was made after performing undo operation since pointer is not pointing to the last state
+                    if (pointer < states.Count - 1)
+                        // newState now becomes the last state, remove all states that happened after it
+                        states.RemoveAll(other => states.IndexOf(other) > pointer);
+
+                    states.Add(newState);
+
+                    // set pointer to the new state   
+                    pointer = states.IndexOf(newState);
+                }
+            }
+
+            // print the final state of the board once the game has ended
+            board.PrintBoard();
+            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
+        }
+
+        private static void HumanVsHuman(Board board)
         {
             // Red player starts the game
             var currentPlayer = Square.Red;
 
-            // array lists for storing all subsequent states of the game and pointers to them
-            var states = new ArrayList();
-            var pointers = new ArrayList();
+            // list for storing all subsequent states of the game
+            List<State> states = new List<State>();
 
             // add initial state of the game to the list
-            states.Add(new State(board.GetState(), currentPlayer));
+            State firstState = new State(board.GetState(), currentPlayer);
+            states.Add(firstState);
 
-            // initialize pointer variable and add pointer to the initial state of the game to the list
-            var pointer = 0;
-            pointers.Add(pointer);
+            // initialize pointer variable and point it to the initial state of the game
+            int pointer = 0;
 
             // continue the game as long as current player has any pieces left
             while (board.GetPlayersPieces(currentPlayer).Any())
             {
                 Console.WriteLine("\nPlayer turn: {0}", currentPlayer);
-/*
-                Console.Write("Pointers list: ");
-                foreach (var point in pointers)
-                    Console.Write(" {0}, ", point);
-                Console.WriteLine();
-                Console.Write("States list: ");
-                foreach (var state in states)
-                    Console.Write("state" + states.IndexOf(state) + ", ");
 
-                Console.WriteLine();
-                Console.WriteLine("Pointer: " + pointer);
-
-                Console.WriteLine("Current state: " + states.IndexOf(states[pointer]));
-*/
                 board.PrintBoard();
 
                 // get the list of pieces belonging to current player
@@ -512,17 +491,15 @@ namespace Checkers
 
                 if (choice.Equals("undo", StringComparison.CurrentCultureIgnoreCase))
                 {
-                    //Console.WriteLine("Pointer: " + (pointer) + ", pointers[pointers.IndexOf(pointer)-1]: " + pointers[pointers.IndexOf(pointer)-1]);                    
-                    if (pointer > 0 && pointer - (int) pointers[pointers.IndexOf(pointer) - 1] == 1)
+                    if (pointer > 0)
                     {
-                        var previousState = (State) states[pointer - 1];
-                        Console.WriteLine("Restoring state #" + states.IndexOf(previousState));
+                        pointer--;
+                        State previousState = states[pointer].DeepCopy();
+
+                        Console.WriteLine("RESTORED STATE: " + pointer);
+
                         board.SetState(previousState.BoardState);
-
                         currentPlayer = previousState.CurrentPlayer;
-
-                        pointer = states.IndexOf(previousState);
-                        pointers.Add(pointer);
                     }
                     else
                     {
@@ -533,13 +510,13 @@ namespace Checkers
                 {
                     if (pointer < states.Count - 1)
                     {
-                        var redoState = (State) states[pointer + 1];
+                        pointer++;
+                        State redoState = states[pointer].DeepCopy();
+
+                        Console.WriteLine("RESTORED STATE: " + pointer);
+
                         board.SetState(redoState.BoardState);
-
                         currentPlayer = redoState.CurrentPlayer;
-
-                        pointer = states.IndexOf(redoState);
-                        pointers.Add(pointer);
                     }
                     else
                     {
@@ -561,13 +538,6 @@ namespace Checkers
 
                         // move can be made as it's in the list of legal moves, perform it
                         board.MovePiece(move);
-
-                        // add new state to the list after move has been performed    
-                        var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                        states.Add(newState);
-
-                        pointer = states.IndexOf(newState);
-                        pointers.Add(pointer);
                     }
 
                     // force the player to make a jump
@@ -582,14 +552,6 @@ namespace Checkers
                             bool kingBeforeJump = jumpingPiece.IsKing;
 
                             board.DoJump(move, jumpingPiece);
-
-                            // add new state to the list after jump has been made                                             
-                            var newState = new State(board.GetState(), ChangeTurn(currentPlayer));
-                            states.Add(newState);
-
-                            // add pointer to the newly created state to the list of pointers
-                            pointer = states.IndexOf(newState);
-                            pointers.Add(pointer);
 
                             // update variables of the piece that has just jumped
                             jumpingPiece.HasJustJumped = true;
@@ -619,8 +581,26 @@ namespace Checkers
                         }
                     }
 
-                    // change turn
-                    currentPlayer = ChangeTurn(currentPlayer);
+                    currentPlayer = ChangeTurn(currentPlayer);                    
+
+                    // create new state of the game after move was made
+                    State newState = new State(board.GetState(), currentPlayer);
+
+                    // move was made after performing undo operation since pointer is not pointing to the last state
+                    if (pointer < states.Count - 1)
+                        // newState now becomes the last state, remove all states that happened after it
+                        states.RemoveAll(other => states.IndexOf(other) > pointer);
+
+                    states.Add(newState);
+
+                    // set pointer to the new state   
+                    pointer = states.IndexOf(newState);
+
+/*                    foreach (State state in states)
+                    {
+                        Console.WriteLine("-----------State number " + states.IndexOf(state));
+                        state.PrintState();
+                    }*/
                 }
             }
 
@@ -712,9 +692,11 @@ namespace Checkers
             {
                 var newArr = new Square[8, 8];
 
-                for (var row = 0; row < 8; row++)
+                Array.Copy(_board, newArr, _board.Length);
+
+/*                for (var row = 0; row < 8; row++)
                 for (var col = 0; col < 8; col++)
-                    newArr[row, col] = _board[row, col];
+                    newArr[row, col] = _board[row, col];*/
 
                 return newArr;
             }
@@ -732,6 +714,11 @@ namespace Checkers
             /// </summary>
             public void MovePiece(Move move)
             {
+/*                if (move.IsJump)
+                {
+                    this.DoJump(move);
+                }*/
+
                 var fromRow = move.FromRow;
                 var fromCol = move.FromCol;
                 var toRow = move.ToRow;
@@ -857,13 +844,13 @@ namespace Checkers
                 for (var row = -1; row < Size; row++)
                 {
                     if (row == -1)
-                        Console.Write("     ");
+                        Console.Write("   ");
                     else
-                        Console.Write("X={0}  ", row);
+                        Console.Write(" {0} ", row);
 
                     for (var col = 0; col < Size; col++)
                         if (row == -1)
-                            Console.Write("Y={0} ", col);
+                            Console.Write(" {0}  ", col);
                         else
                             switch ((int) _board[row, col])
                             {
@@ -1062,7 +1049,6 @@ namespace Checkers
                 {
                     SetKing(_board[fromRow, fromCol], toRow, toCol);
                     becameKing = true;
-                    Console.WriteLine("KING SET AFTER JUMP");
                 }
 
                 // perform a jump using red piece
@@ -1421,9 +1407,63 @@ namespace Checkers
                 CurrentPlayer = currentPlayer;
             }
 
+            /// <summary>
+            /// Make a deep copy of the state
+            /// </summary>
+            public State DeepCopy()
+            {
+                State other = (State)this.MemberwiseClone();
+                other.BoardState = BoardState.Clone() as Square[,];
+                other.CurrentPlayer = (Square) ((int) this.CurrentPlayer);
+
+                return other;
+            }
+
             public Square[,] BoardState { get; set; }
 
             public Square CurrentPlayer { get; set; }
+
+            public void PrintState()
+            {
+                Console.WriteLine();
+                for (var row = -1; row < 8; row++)
+                {
+                    if (row == -1)
+                        Console.Write("   ");
+                    else
+                        Console.Write(" {0} ", row);
+
+                    for (var col = 0; col < 8; col++)
+                        if (row == -1)
+                            Console.Write(" {0}  ", col);
+                        else
+                            switch ((int) BoardState[row, col])
+                            {
+                                case 0:
+                                    Console.Write(" {0}  ", "-");
+                                    break;
+                                case 1:
+                                    Console.Write(" {0}  ", "-");
+                                    break;
+                                case 2:
+                                    Console.Write(" {0}  ", "R");
+                                    break;
+                                case 3:
+                                    Console.Write(" {0}  ", "W");
+                                    break;
+                                case 4:
+                                    Console.Write(" {0} ", "RK");
+                                    break;
+                                case 5:
+                                    Console.Write(" {0} ", "WK");
+                                    break;
+                            }
+
+                    Console.WriteLine();
+                }
+
+                Console.WriteLine();
+            }
         }
 
         /// <summary>
