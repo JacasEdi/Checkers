@@ -4,13 +4,19 @@ using System.Drawing;
 
 namespace Checkers
 {
+    /// <summary>
+    /// This class represent the board for the game of checkers. It handles most of the games logic, such as 
+    /// moving pieces around the board, generating regular moves and jumps, and removing pieces that've been captured
+    /// </summary>
     public class Board
     {
         private const int Size = 8;
+
+        // two-dimensonal array of Square object that represents the board and pieces
         private Program.Square[,] _board = new Program.Square[8, 8];
 
         /// <summary>
-        /// Make a deep copy of the board
+        /// Makes a deep copy of the board
         /// </summary>
         public Board DeepCopy()
         {
@@ -20,7 +26,7 @@ namespace Checkers
         }
 
         /// <summary>
-        /// Initialize an empty board and place red and white pieces in relevant squares
+        /// Initializes an empty board and then places red and white pieces in relevant squares
         /// </summary>
         public Board()
         {
@@ -29,7 +35,7 @@ namespace Checkers
         }
 
         /// <summary>
-        /// Get current state of a board, ie. how squares are laid out
+        /// Returns current state of the board, ie. how pieces are positioned at this particular stage
         /// </summary>
         public Program.Square[,] GetState()
         {
@@ -45,7 +51,7 @@ namespace Checkers
         }
 
         /// <summary>
-        /// Set the state of the board using the state provided
+        /// Sets the state of the board using the state provided
         /// </summary>
         public void SetState(Program.Square[,] state)
         {
@@ -53,7 +59,7 @@ namespace Checkers
         }
 
         /// <summary>
-        /// Changes the location of a piece using the provided move
+        /// Changes the location of a piece using the move provided
         /// </summary>
         public void MovePiece(Move move)
         {
@@ -174,7 +180,7 @@ namespace Checkers
         }
 
         /// <summary>
-        /// Print out the current state of the board to the console
+        /// Prints out the current state of the board
         /// </summary>
         public void PrintBoard()
         {
@@ -713,7 +719,7 @@ namespace Checkers
                 var rowFrom = piece.X;
                 var colFrom = piece.Y;
 
-                // determine whether whether it's Red/White/RedKing/WhiteKing
+                // determine whether it's Red/White/RedKing/WhiteKing
                 var pieceType = piece.Type;
 
                 // each piece can go in up to 7 directions from where it stands

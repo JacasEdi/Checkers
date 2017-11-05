@@ -1,7 +1,7 @@
 ﻿namespace Checkers
 {
     /// <summary>
-    /// Class to represent a piece in the game.
+    /// This class represents a piece in the game of checkers.
     /// </summary>
     public class Piece
     {

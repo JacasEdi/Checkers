@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 
 namespace Checkers
@@ -9,35 +8,61 @@ namespace Checkers
     {
         private static void Main(string[] args)
         {
-            var board = new Board();
+            int choice;
 
-            Console.WriteLine("Choose the game mode");
-            Console.WriteLine("1 - Human vs Human");
-            Console.WriteLine("2 - Human vs AI");
-            Console.WriteLine("3 - AI vs AI");
-
-            var choice = Console.ReadLine();
-
-            while (!int.TryParse(choice, out int val) || val > 3 || val < 1)
+            do
             {
-                Console.WriteLine("Please provide a valid option");
-                choice = Console.ReadLine();
-            }
+                var board = new Board();
 
-            switch (Int32.Parse(choice))
-            {
-                case 1:
-                    HumanVsHuman(board);
-                    break;
-                case 2:
-                    HumanVsAi(board);
-                    break;
-                case 3:
-                    AiVsAi(board);
-                    break;
-            }
+                Console.WriteLine("Choose the game mode");
+                Console.WriteLine("1 - Human vs Human");
+                Console.WriteLine("2 - Human vs AI");
+                Console.WriteLine("3 - AI vs AI");
+
+                var gameMode = Console.ReadLine();
+
+                while (!int.TryParse(gameMode, out int val) || val > 3 || val < 1)
+                {
+                    Console.WriteLine("Please provide a valid option");
+                    gameMode = Console.ReadLine();
+                }
+
+                switch (Int32.Parse(gameMode))
+                {
+                    case 1:
+                        HumanVsHuman(board);
+                        break;
+                    case 2:
+                        HumanVsAi(board);
+                        break;
+                    case 3:
+                        AiVsAi(board);
+                        break;
+                }
+
+                Console.WriteLine("\nWhat next?");
+                Console.WriteLine("1 - Play another game");
+                Console.WriteLine("2 - Quit");
+
+                String answer = Console.ReadLine();
+
+                while (!int.TryParse(answer, out int val) || val > 2  || val < 1)
+                {
+                    Console.WriteLine("Please provide a valid option");
+                    answer = Console.ReadLine();
+                }
+
+                choice = int.Parse(answer);
+
+            } while (choice != 2);
+
         }
 
+        /// <summary>
+        /// Allows two AI players to play against each other. Records the state of the game after each turn to
+        /// allow the game to be replayed
+        /// </summary>
+        /// <param name="board"></param>
         private static void AiVsAi(Board board)
         {
             Square currentPlayer = Square.Red;
@@ -71,10 +96,11 @@ namespace Checkers
                     break;
 
                 State state = new State(board.GetState(), currentPlayer);
+
+                // get the move from the AI player based on the current state of the board
                 Move bestMove = bot.GetBestMove(board, state);
 
-                Console.WriteLine("AI's move: from {0} to {1}", bestMove.CoordinateFrom, bestMove.CoordinateTo);
-
+                // AI is jumping
                 if (bestMove.IsJump)
                 {
                     while (legalJumps.Any())
@@ -84,6 +110,7 @@ namespace Checkers
                         bool kingBeforeJump = jumpingPiece.IsKing;
 
                         board.DoJump(bestMove, jumpingPiece);
+                        Console.WriteLine("AI's move: from {0} to {1}", bestMove.CoordinateFrom, bestMove.CoordinateTo);
 
                         // update variables of the piece that has just jumped
                         jumpingPiece.HasJustJumped = true;
@@ -102,6 +129,7 @@ namespace Checkers
                         if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
                             break;
 
+                        // make a subsequent jump if there is one
                         if (legalJumps.Any())
                             bestMove = legalJumps.First();
                     }
@@ -109,6 +137,7 @@ namespace Checkers
                 else
                 {
                     board.MovePiece(bestMove);
+                    Console.WriteLine("AI's move: from {0} to {1}", bestMove.CoordinateFrom, bestMove.CoordinateTo);
                 }
 
                 currentPlayer = ChangeTurn(currentPlayer);
@@ -130,8 +159,16 @@ namespace Checkers
             // print the final state of the board once the game has ended
             board.PrintBoard();
             Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
+
+            // determine whether user wants to replay the game
+            ReplayGame(states);
         }
 
+        /// <summary>
+        /// Allows human player to play against AI player. Records the state of the game after each turn to provide
+        /// undo/redo/replay functionalities
+        /// </summary>
+        /// <param name="board"></param>
         private static void HumanVsAi(Board board)
         {
             Square currentPlayer = Square.Red;
@@ -164,6 +201,7 @@ namespace Checkers
                 if (legalJumps.Count + legalMoves.Count == 0)
                     break;
 
+                // human player's turn
                 if (currentPlayer == Square.Red)
                 {
                     Console.WriteLine("What would you like to do? Type 'Undo', 'Redo', or press enter to carry on");
@@ -171,13 +209,17 @@ namespace Checkers
 
                     if (choice.Equals("undo", StringComparison.CurrentCultureIgnoreCase))
                     {
+                        // check whether there were any states before current state
                         if (pointer > 0)
                         {
                             pointer -= 2;
+
+                            // get a deep copy of the previous state of the game
                             State previousState = states[pointer].DeepCopy();
 
-                            Console.WriteLine("RESTORED STATE: " + pointer);
+                            //Console.WriteLine("RESTORED STATE: " + pointer);
 
+                            // set previous state of the game to be the current state and reverse player's turn
                             board.SetState(previousState.BoardState);
                             currentPlayer = previousState.CurrentPlayer;
                         }
@@ -188,13 +230,17 @@ namespace Checkers
                     }
                     else if (choice.Equals("redo", StringComparison.CurrentCultureIgnoreCase))
                     {
+                        // check whether there were any states after current state
                         if (pointer < states.Count - 1)
                         {
                             pointer += 2;
+
+                            // get a deep copy of the next state of the game
                             State redoState = states[pointer].DeepCopy();
 
-                            Console.WriteLine("RESTORED STATE: " + pointer);
+                            //Console.WriteLine("RESTORED STATE: " + pointer);
 
+                            // set next state of the game to be the current state and reverse player's turn
                             board.SetState(redoState.BoardState);
                             currentPlayer = redoState.CurrentPlayer;
                         }
@@ -278,13 +324,15 @@ namespace Checkers
                         pointer = states.IndexOf(newState);
                     }
                 }
+                // AI player's turn
                 else if (currentPlayer == Square.White)
                 {
                     State state = new State(board.GetState(), currentPlayer);
+
+                    // get the move from the AI player based on the current state of the board
                     Move bestMove = bot.GetBestMove(board, state);
 
-                    Console.WriteLine("AI's move from {0} to {1}", bestMove.CoordinateFrom, bestMove.CoordinateTo);
-
+                    // AI is jumping
                     if (bestMove.IsJump)
                     {
                         while (legalJumps.Any())
@@ -294,6 +342,7 @@ namespace Checkers
                             bool kingBeforeJump = jumpingPiece.IsKing;
 
                             board.DoJump(bestMove, jumpingPiece);
+                            Console.WriteLine("AI's move from {0} to {1}", bestMove.CoordinateFrom, bestMove.CoordinateTo);
 
                             // update variables of the piece that has just jumped
                             jumpingPiece.HasJustJumped = true;
@@ -312,6 +361,7 @@ namespace Checkers
                             if (!kingBeforeJump && bestMove.ToRow == 0 | bestMove.ToRow == 7)
                                 break;
 
+                            // make a subsequent jump if there is one
                             if (legalJumps.Any())
                                 bestMove = legalJumps.First();
                         }
@@ -319,6 +369,7 @@ namespace Checkers
                     else
                     {
                         board.MovePiece(bestMove);
+                        Console.WriteLine("AI's move from {0} to {1}", bestMove.CoordinateFrom, bestMove.CoordinateTo);
                     }
 
                     currentPlayer = ChangeTurn(currentPlayer);
@@ -341,8 +392,16 @@ namespace Checkers
             // print the final state of the board once the game has ended
             board.PrintBoard();
             Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
+
+            // determine whether user wants to replay the game
+            ReplayGame(states);
         }
 
+        /// <summary>
+        /// Allows two human players to play against each other. Records the state of the game after each turn to 
+        /// provide undo/redo/replay functionalities
+        /// </summary>
+        /// <param name="board"></param>
         private static void HumanVsHuman(Board board)
         {
             // Red player starts the game
@@ -381,13 +440,17 @@ namespace Checkers
 
                 if (choice.Equals("undo", StringComparison.CurrentCultureIgnoreCase))
                 {
+                    // check whether there were any states before current state
                     if (pointer > 0)
                     {
                         pointer--;
+
+                        // get a deep copy of the previous state of the game
                         State previousState = states[pointer].DeepCopy();
 
-                        Console.WriteLine("RESTORED STATE: " + pointer);
+                        //Console.WriteLine("RESTORED STATE: " + pointer);
 
+                        // set previous state of the game to be the current state and reverse player's turn
                         board.SetState(previousState.BoardState);
                         currentPlayer = previousState.CurrentPlayer;
                     }
@@ -398,13 +461,17 @@ namespace Checkers
                 }
                 else if (choice.Equals("redo", StringComparison.CurrentCultureIgnoreCase))
                 {
+                    // check whether there were any states after current state
                     if (pointer < states.Count - 1)
                     {
                         pointer++;
+
+                        // get a deep copy of the next state of the game
                         State redoState = states[pointer].DeepCopy();
 
-                        Console.WriteLine("RESTORED STATE: " + pointer);
+                        //Console.WriteLine("RESTORED STATE: " + pointer);
 
+                        // set next state of the game to be the current state and reverse player's turn
                         board.SetState(redoState.BoardState);
                         currentPlayer = redoState.CurrentPlayer;
                     }
@@ -491,8 +558,85 @@ namespace Checkers
             // print the final state of the board once the game has ended
             board.PrintBoard();
             Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
+
+            // determine whether user wants to replay the game
+            ReplayGame(states);
         }
 
+        /// <summary>
+        /// Allows the user to replay the game once it's finished, ie. see how the state of the game was changing
+        /// between the turns requested by the user.
+        /// </summary>
+        /// <param name="states"></param>
+        private static void ReplayGame(List<State> states)
+        {
+            Console.WriteLine("Replay the game? Plase answer Y/N");
+            string answer = Console.ReadLine();
+
+            while (!answer.Equals("y") && !answer.Equals("n"))
+            {
+                Console.WriteLine("Please type 'Y' to replay the game or 'N' to skip");
+                answer = Console.ReadLine();
+            }
+
+            if (answer.Equals("y"))
+            {
+                Console.WriteLine("There were {0} turns in the game", states.Count);
+                Console.WriteLine("Turn to replay from? Type 'first' to replay from first turn or provide a number");
+                var replayFrom = Console.ReadLine();
+
+                int indexFrom;
+                if (replayFrom.Equals("first"))
+                {
+                    indexFrom = states.IndexOf(states.First());
+                }
+                else
+                {
+                    while (!int.TryParse(replayFrom, out int val) || val > states.Count - 1 || val < 1)
+                    {
+                        Console.WriteLine("Please provide a valid turn number");
+                        replayFrom = Console.ReadLine();
+                    }
+
+                    indexFrom = int.Parse(replayFrom)-1;
+                }
+
+                Console.WriteLine("Turn to replay to? Type 'last' to replay to the last turn or provide a number");
+                var replayTo = Console.ReadLine();
+
+                int indexTo;
+                if (replayTo.Equals("last"))
+                {
+                    indexTo = states.IndexOf(states.Last());
+                }
+                else
+                {
+                    while (!int.TryParse(replayTo, out int val) || val > states.Count || val < 2 || val <= indexFrom)
+                    {
+                        Console.WriteLine("Please provide a valid turn number");
+                        replayTo = Console.ReadLine();
+                    }
+
+                    indexTo = int.Parse(replayTo)-1;
+                }
+
+                // print each following state of the board between the requested turns
+                for (int i = indexFrom; i <= indexTo; i++)
+                {
+                    if (i == states.Count-1)
+                        Console.WriteLine("Turn #{0}, {1} player won", i+1, ChangeTurn(states[i].CurrentPlayer));
+                    else
+                        Console.WriteLine("Turn #{0}, {1} player's turn", i+1, states[i].CurrentPlayer);
+
+                    states[i].PrintState();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Obtains the new move from the user. It doesn't determine whether the move provided is valid or not.
+        /// </summary>
+        /// <returns></returns>
         private static Move RequestMove()
         {
             int rowFrom;
@@ -535,6 +679,11 @@ namespace Checkers
             return new Move(rowFrom, colFrom, rowTo, colTo);
         }
 
+        /// <summary>
+        /// Changes colour of the player provided in the parameter to opposite one.
+        /// </summary>
+        /// <param name="player"></param>
+        /// <returns></returns>
         public static Square ChangeTurn(Square player)
         {
             if (player == Square.Red)
@@ -545,6 +694,9 @@ namespace Checkers
             return Square.EmptyDark;
         }
 
+        /// <summary>
+        /// Represents 6 possible types of squares/pieces that can be present on the board in the game of checkers
+        /// </summary>
         public enum Square
         {
             EmptyLight,

@@ -3,7 +3,8 @@
 namespace Checkers
 {
     /// <summary>
-    /// Class to represent a state of the game, ie. how pieces are positioned on the board and which player's turn is it
+    /// This class represents a state of the game, ie. how pieces are positioned on the board at this particular 
+    /// stage of the game and whether it's Red or White player's turn
     /// </summary>
     public class State
     {
@@ -14,7 +15,7 @@ namespace Checkers
         }
 
         /// <summary>
-        /// Make a deep copy of the state
+        /// Makes a deep copy of the state to use it during undo/redo operations
         /// </summary>
         public State DeepCopy()
         {
@@ -29,6 +30,9 @@ namespace Checkers
 
         public Program.Square CurrentPlayer { get; set; }
 
+        /// <summary>
+        /// Prints the state of the board, ie. how pieces are positioned at this stage of the game
+        /// </summary>
         public void PrintState()
         {
             Console.WriteLine();

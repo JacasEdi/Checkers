@@ -3,7 +3,8 @@
 namespace Checkers
 {
     /// <summary>
-    /// Class to represent a move in a game
+    /// This class represents a move in a game of checkers. It can represent both regular move or a jump and 
+    /// it doesn't validate the move as to whether it is legal or not.
     /// </summary>
     public class Move
     {

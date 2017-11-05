@@ -1,26 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Checkers
 {
+    /// <summary>
+    /// This class handles all AI player's logic and calculations that lead to obtaining best moves for each turn.
+    /// </summary>
     public class Ai
     {
+        /// <summary>
+        /// Retrieves the best move that AI player can perform that is associated with the highest score returned 
+        /// by Negamax method
+        /// </summary>
+        /// <param name="board"></param>
+        /// <param name="state"></param>
+        /// <returns>Returns the best move out of all legal moves for AI player</returns>
         public Move GetBestMove(Board board, State state)
         {
             List<Piece> pieces = board.GetPlayersPieces(state.CurrentPlayer);
             HashSet<Move> legalJumps = board.GetLegalJumps(pieces);
             HashSet<Move> legalMoves = board.GetLegalMoves(pieces);
-
-            foreach (var move in legalJumps)
-            {
-                move.IsJump = true;
-            }
-
             legalMoves.UnionWith(legalJumps);
 
             var bestMoves = new List<Move>();
 
+            // analyze all possible moves three turns ahead while searching for best move for this turn
             int depth = 3;
             double alpha = Double.MinValue;
 
@@ -31,79 +35,61 @@ namespace Checkers
 
             foreach (var move in legalMoves)
             {
+                // make a deep copy of the board to perform a move without changing the original board
                 boardCopy = board.DeepCopy();
 
                 if (move.IsJump)
-                {
                     boardCopy.DoJump(move);
-                }
                 else
-                {
                     boardCopy.MovePiece(move);
-                }
 
+                // create a new state of the game using copy of the original board after move has been performed
                 newState = new State(boardCopy.GetState(), Program.ChangeTurn(currentPlayer));
+
+                // get score for the move that has been applied to copy of the board
                 double newScore = -Negamax(boardCopy, newState, depth - 1, Double.MinValue, -alpha);
 
                 //Console.WriteLine("From {0} To {1} = {2}", move.CoordinateFrom, move.CoordinateTo, newScore);
 
-                int index = bestMoves.FindIndex(other => other.IsJump);
-
+                // if new score is better than alpha, it becomes a new alpha (highest score found so far)
                 if (newScore > alpha)
                 {
                     alpha = newScore;
-
-                    // no jumps were found so far, this move becomes best move
-                    if (index == -1)
-                    {
-                        bestMoves.Clear();
-                        bestMoves.Add(move);
-                    }
-                    // jumps were already in the list of bestMoves
-                    else
-                    {
-                        // if this move is also a jump, then it becomes new best move
-                        if (move.IsJump)
-                        {
-                            bestMoves.Clear();
-                            bestMoves.Add(move);
-                        }
-                    }
+                    bestMoves.Clear();
+                    bestMoves.Add(move);
                 }
-                // this move is equally as good as the best moves found so far
+                // if score for this move is equal to score of best move found so far, add it to the list of best moves
                 else if (newScore == alpha)
                 {
-                    // none of the best moves found so far was a jump, so this move can be added to a list
-                    if (index == -1)
-                        bestMoves.Add(move);
-                    // jumps were already in the list of bestMoves
-                    else
-                    {
-                        // if this move is also a jump, then it can be added to a list
-                        if (move.IsJump)
-                        {
-                            bestMoves.Add(move);
-                        }
-                    }
+                    bestMoves.Add(move);
                 }
             }
+
+            // remove all regular moves from the list of best moves if any jumps were found
+            if (bestMoves.Exists(other => other.IsJump))
+                bestMoves.RemoveAll(notJump => !notJump.IsJump);
 
             return bestMoves[rand.Next(bestMoves.Count)];
         }
 
+        /// <summary>
+        /// Evaluates all possible moves that AI player can make during its current turn in order to
+        /// find the highest score associated with one of these moves
+        /// </summary>
+        /// <param name="board"></param>
+        /// <param name="state"></param>
+        /// <param name="depth"></param>
+        /// <param name="alpha"></param>
+        /// <param name="beta"></param>
+        /// <returns>Returns the highest scored out of all possible moves</returns>
         private double Negamax(Board board, State state, int depth, double alpha, double beta)
         {
             List<Piece> pieces = board.GetPlayersPieces(state.CurrentPlayer);
             HashSet<Move> legalJumps = board.GetLegalJumps(pieces);
             HashSet<Move> legalMoves = board.GetLegalMoves(pieces);
-
-            foreach (var move in legalJumps)
-            {
-                move.IsJump = true;
-            }
-
             legalMoves.UnionWith(legalJumps);
 
+            // evaluate the state of the board in order to obtain the score if depth has reached zero
             if (depth == 0)
                 return Evaluate(state);
 
@@ -116,17 +102,14 @@ namespace Checkers
                 boardCopy = board.DeepCopy();
 
                 if (move.IsJump)
-                {
                     boardCopy.DoJump(move);
-                }
                 else
-                {
                     boardCopy.MovePiece(move);
-                }
 
                 newState = new State(boardCopy.GetState(), Program.ChangeTurn(currentPlayer));
                 double newScore = -Negamax(boardCopy, newState, depth - 1, -beta, -alpha);
 
+                // alpha-beta cut-off
                 if (newScore >= beta)
                     return newScore;
                 if (newScore > alpha)
@@ -136,6 +119,13 @@ namespace Checkers
             return alpha;
         }
 
+        /// <summary>
+        /// Evaluates the state of the board provided by Negamax method by calculating the difference in number of 
+        /// both players' pieces, either from Red or from White player's perspective
+        /// </summary>
+        /// <param name="state"></param>
+        /// <returns>Returns the score for a move which is the difference between the number of players' pieces
+        /// left on the board once the move has been applied</returns>
         private static int Evaluate(State state)
         {
             int red = 0;
@@ -158,9 +148,11 @@ namespace Checkers
                 }
             }
 
+            // return the difference between the number of red and white pieces if calculating for red player
             if (currentPlayer == Program.Square.Red || currentPlayer == Program.Square.RedKing)
                 return red - white;
 
+            // return the difference between the number of white and red pieces if calculating for white player
             return white - red;
         }
     }
