@@ -6,6 +6,8 @@ namespace Checkers
 {
     public class Program
     {
+        private static List<List<State>> previousGames = new List<List<State>>();
+
         private static void Main(string[] args)
         {
             int choice;
@@ -14,14 +16,16 @@ namespace Checkers
             {
                 var board = new Board();
 
-                Console.WriteLine("Choose the game mode");
+                Console.WriteLine("Choose the option");
                 Console.WriteLine("1 - Human vs Human");
                 Console.WriteLine("2 - Human vs AI");
                 Console.WriteLine("3 - AI vs AI");
+                Console.WriteLine("4 - Replay previous game");
+                Console.WriteLine("5 - Quit");
 
                 var gameMode = Console.ReadLine();
 
-                while (!int.TryParse(gameMode, out int val) || val > 3 || val < 1)
+                while (!int.TryParse(gameMode, out int val) || val > 5 || val < 1)
                 {
                     Console.WriteLine("Please provide a valid option");
                     gameMode = Console.ReadLine();
@@ -38,24 +42,49 @@ namespace Checkers
                     case 3:
                         AiVsAi(board);
                         break;
+                    case 4:
+                        if (previousGames.Any())
+                        {
+                            Console.WriteLine("Select a game to replay");
+                            foreach (var game in previousGames)
+                            {
+                                Console.WriteLine("Game #{0}", previousGames.IndexOf(game) + 1);
+                            }
+
+                            String gameId = Console.ReadLine();
+
+                            while (!int.TryParse(gameId, out int val) || val > previousGames.Count || val < 1)
+                            {
+                                Console.WriteLine("Please provide a valid option");
+                                gameId = Console.ReadLine();
+                            }
+
+                            ReplayGame(previousGames[int.Parse(gameId) - 1]);
+                        }
+                        else
+                        {
+                            Console.WriteLine("No games to replay");
+                        }
+                        break;
+                    case 5:
+                        Environment.Exit(0);
+                        break;
                 }
 
                 Console.WriteLine("\nWhat next?");
-                Console.WriteLine("1 - Play another game");
+                Console.WriteLine("1 - Play another game or replay previous one");
                 Console.WriteLine("2 - Quit");
 
                 String answer = Console.ReadLine();
 
-                while (!int.TryParse(answer, out int val) || val > 2  || val < 1)
+                while (!int.TryParse(answer, out int val) || val > 2 || val < 1)
                 {
                     Console.WriteLine("Please provide a valid option");
                     answer = Console.ReadLine();
                 }
 
                 choice = int.Parse(answer);
-
             } while (choice != 2);
-
         }
 
         /// <summary>
@@ -82,6 +111,7 @@ namespace Checkers
             // continue the game as long as current player has any pieces left
             while (board.GetPlayersPieces(currentPlayer).Any())
             {
+                Console.WriteLine("\n\nPlayer turn: {0}", currentPlayer);
                 board.PrintBoard();
 
                 // get the list of pieces belonging to current player
@@ -152,7 +182,7 @@ namespace Checkers
 
                 states.Add(newState);
 
-                // set pointer to the new state   
+                // set pointer to the new state
                 pointer = states.IndexOf(newState);
             }
 
@@ -160,8 +190,20 @@ namespace Checkers
             board.PrintBoard();
             Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
 
-            // determine whether user wants to replay the game
-            ReplayGame(states);
+            // add states all subsequent states of the game to the list of previous games
+            previousGames.Add(states);
+
+            Console.WriteLine("Replay the game? Plase answer Y/N");
+            string answer = Console.ReadLine();
+
+            while (!answer.Equals("y") && !answer.Equals("n"))
+            {
+                Console.WriteLine("Please type 'Y' to replay the game or 'N' to skip");
+                answer = Console.ReadLine();
+            }
+
+            if (answer.Equals("y"))
+                ReplayGame(states);
         }
 
         /// <summary>
@@ -188,6 +230,7 @@ namespace Checkers
             // continue the game as long as current player has any pieces left
             while (board.GetPlayersPieces(currentPlayer).Any())
             {
+                Console.WriteLine("\n\nPlayer turn: {0}", currentPlayer);
                 board.PrintBoard();
 
                 // get the list of pieces belonging to current player
@@ -393,8 +436,20 @@ namespace Checkers
             board.PrintBoard();
             Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
 
-            // determine whether user wants to replay the game
-            ReplayGame(states);
+            // add states all subsequent states of the game to the list of previous games
+            previousGames.Add(states);
+
+            Console.WriteLine("Replay the game? Plase answer Y/N");
+            string answer = Console.ReadLine();
+
+            while (!answer.Equals("y") && !answer.Equals("n"))
+            {
+                Console.WriteLine("Please type 'Y' to replay the game or 'N' to skip");
+                answer = Console.ReadLine();
+            }
+
+            if (answer.Equals("y"))
+                ReplayGame(states);
         }
 
         /// <summary>
@@ -420,8 +475,7 @@ namespace Checkers
             // continue the game as long as current player has any pieces left
             while (board.GetPlayersPieces(currentPlayer).Any())
             {
-                Console.WriteLine("\nPlayer turn: {0}", currentPlayer);
-
+                Console.WriteLine("\n\nPlayer turn: {0}", currentPlayer);
                 board.PrintBoard();
 
                 // get the list of pieces belonging to current player
@@ -559,17 +613,9 @@ namespace Checkers
             board.PrintBoard();
             Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
 
-            // determine whether user wants to replay the game
-            ReplayGame(states);
-        }
+            // add states all subsequent states of the game to the list of previous games
+            previousGames.Add(states);
 
-        /// <summary>
-        /// Allows the user to replay the game once it's finished, ie. see how the state of the game was changing
-        /// between the turns requested by the user.
-        /// </summary>
-        /// <param name="states"></param>
-        private static void ReplayGame(List<State> states)
-        {
             Console.WriteLine("Replay the game? Plase answer Y/N");
             string answer = Console.ReadLine();
 
@@ -580,56 +626,64 @@ namespace Checkers
             }
 
             if (answer.Equals("y"))
+                ReplayGame(states);
+        }
+
+        /// <summary>
+        /// Allows the user to replay the game once it's finished, ie. see how the state of the game was changing
+        /// between the turns requested by the user.
+        /// </summary>
+        /// <param name="states"></param>
+        private static void ReplayGame(List<State> states)
+        {
+            Console.WriteLine("There were {0} turns in the game", states.Count);
+            Console.WriteLine("Turn to replay from? Type 'first' to replay from first turn or provide a number");
+            var replayFrom = Console.ReadLine();
+
+            int indexFrom;
+            if (replayFrom.Equals("first"))
             {
-                Console.WriteLine("There were {0} turns in the game", states.Count);
-                Console.WriteLine("Turn to replay from? Type 'first' to replay from first turn or provide a number");
-                var replayFrom = Console.ReadLine();
-
-                int indexFrom;
-                if (replayFrom.Equals("first"))
+                indexFrom = states.IndexOf(states.First());
+            }
+            else
+            {
+                while (!int.TryParse(replayFrom, out int val) || val > states.Count - 1 || val < 1)
                 {
-                    indexFrom = states.IndexOf(states.First());
+                    Console.WriteLine("Please provide a valid turn number");
+                    replayFrom = Console.ReadLine();
                 }
+
+                indexFrom = int.Parse(replayFrom) - 1;
+            }
+
+            Console.WriteLine("Turn to replay to? Type 'last' to replay to the last turn or provide a number");
+            var replayTo = Console.ReadLine();
+
+            int indexTo;
+            if (replayTo.Equals("last"))
+            {
+                indexTo = states.IndexOf(states.Last());
+            }
+            else
+            {
+                while (!int.TryParse(replayTo, out int val) || val > states.Count || val < 2 || val <= indexFrom)
+                {
+                    Console.WriteLine("Please provide a valid turn number");
+                    replayTo = Console.ReadLine();
+                }
+
+                indexTo = int.Parse(replayTo) - 1;
+            }
+
+            // print each following state of the board between the requested turns
+            for (int i = indexFrom; i <= indexTo; i++)
+            {
+                if (i == states.Count - 1)
+                    Console.WriteLine("Turn #{0}, {1} player won", i + 1, ChangeTurn(states[i].CurrentPlayer));
                 else
-                {
-                    while (!int.TryParse(replayFrom, out int val) || val > states.Count - 1 || val < 1)
-                    {
-                        Console.WriteLine("Please provide a valid turn number");
-                        replayFrom = Console.ReadLine();
-                    }
+                    Console.WriteLine("Turn #{0}, {1} player's turn", i + 1, states[i].CurrentPlayer);
 
-                    indexFrom = int.Parse(replayFrom)-1;
-                }
-
-                Console.WriteLine("Turn to replay to? Type 'last' to replay to the last turn or provide a number");
-                var replayTo = Console.ReadLine();
-
-                int indexTo;
-                if (replayTo.Equals("last"))
-                {
-                    indexTo = states.IndexOf(states.Last());
-                }
-                else
-                {
-                    while (!int.TryParse(replayTo, out int val) || val > states.Count || val < 2 || val <= indexFrom)
-                    {
-                        Console.WriteLine("Please provide a valid turn number");
-                        replayTo = Console.ReadLine();
-                    }
-
-                    indexTo = int.Parse(replayTo)-1;
-                }
-
-                // print each following state of the board between the requested turns
-                for (int i = indexFrom; i <= indexTo; i++)
-                {
-                    if (i == states.Count-1)
-                        Console.WriteLine("Turn #{0}, {1} player won", i+1, ChangeTurn(states[i].CurrentPlayer));
-                    else
-                        Console.WriteLine("Turn #{0}, {1} player's turn", i+1, states[i].CurrentPlayer);
-
-                    states[i].PrintState();
-                }
+                states[i].PrintState();
             }
         }
 
