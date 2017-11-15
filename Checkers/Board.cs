@@ -107,7 +107,7 @@ namespace Checkers
         private bool IsMovePermitted(Program.Square currentPiece, Move move)
         {
             // can't move outside the board
-            if (move.ToRow < 0 || move.ToRow > 7 || move.ToCol < 0 || move.ToCol > 7)
+            if (move.ToRow < 0 | move.ToRow > 7 | move.ToCol < 0 | move.ToCol > 7)
                 return false;
 
             // can't move onto a light square
@@ -256,6 +256,10 @@ namespace Checkers
             var colDirection = move.FromCol - move.ToCol;
             var rowDirection = move.FromRow - move.ToRow;
 
+            // can't jump outside the board
+            if (move.ToRow < 0 | move.ToRow > 7 | move.ToCol < 0 | move.ToCol > 7)
+                return false;
+
             // set opponent and opponentsKing variables to opposite colour to the currentPlayer's pieces
             if (currentPlayer == Program.Square.Red || currentPlayer == Program.Square.RedKing)
             {
@@ -396,7 +400,7 @@ namespace Checkers
             }
 
             // perform a jump using red piece
-            if (_board[fromRow, fromCol] == Program.Square.Red)
+            if (_board[fromRow, fromCol] == Program.Square.Red && !jumpingPiece.HasJustJumped)
             {
                 // jumping to the right
                 if (directionCol == -2)
@@ -423,7 +427,7 @@ namespace Checkers
             }
 
             // perform a jump using white piece
-            if (_board[fromRow, fromCol] == Program.Square.White)
+            if (_board[fromRow, fromCol] == Program.Square.White && !jumpingPiece.HasJustJumped)
             {
                 // jumping to the right
                 if (directionCol == -2)
@@ -724,6 +728,7 @@ namespace Checkers
 
                 // each piece can go in up to 7 directions from where it stands
                 for (var i = -1; i < 7; i++)
+                {
                     // checking if it can move to any of the 3 squares directly below itself
                     if (i < 2)
                     {
@@ -748,6 +753,7 @@ namespace Checkers
                         if (IsMovePermitted(pieceType, new Move(rowFrom, colFrom, rowFrom + 1, colFrom + (i - 5))))
                             legalMoves.Add(new Move(rowFrom, colFrom, rowFrom + 1, colFrom + (i - 5)));
                     }
+                }
             }
 
             /*                Console.WriteLine("Legal moves: ");
@@ -771,10 +777,6 @@ namespace Checkers
                 return _board[coordinates.X, coordinates.Y];
             }
             catch (IndexOutOfRangeException)
-            {
-                return Program.Square.EmptyLight;
-            }
-            catch (Exception)
             {
                 return Program.Square.EmptyLight;
             }

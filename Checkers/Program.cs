@@ -111,7 +111,7 @@ namespace Checkers
             // continue the game as long as current player has any pieces left
             while (board.GetPlayersPieces(currentPlayer).Any())
             {
-                Console.WriteLine("\n\nPlayer turn: {0}", currentPlayer);
+                Console.WriteLine("\n\nTurn #{0} Player: {1}", pointer + 1, currentPlayer);
                 board.PrintBoard();
 
                 // get the list of pieces belonging to current player
@@ -186,9 +186,10 @@ namespace Checkers
                 pointer = states.IndexOf(newState);
             }
 
+            Console.WriteLine("\n\n{0} player won!", ChangeTurn(currentPlayer));
+
             // print the final state of the board once the game has ended
             board.PrintBoard();
-            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
 
             // add states all subsequent states of the game to the list of previous games
             previousGames.Add(states);
@@ -230,7 +231,7 @@ namespace Checkers
             // continue the game as long as current player has any pieces left
             while (board.GetPlayersPieces(currentPlayer).Any())
             {
-                Console.WriteLine("\n\nPlayer turn: {0}", currentPlayer);
+                Console.WriteLine("\n\nTurn #{0} Player: {1}", pointer + 1, currentPlayer);
                 board.PrintBoard();
 
                 // get the list of pieces belonging to current player
@@ -432,9 +433,10 @@ namespace Checkers
                 }
             }
 
+            Console.WriteLine("\n\n{0} player won!", ChangeTurn(currentPlayer));
+
             // print the final state of the board once the game has ended
             board.PrintBoard();
-            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
 
             // add states all subsequent states of the game to the list of previous games
             previousGames.Add(states);
@@ -475,7 +477,7 @@ namespace Checkers
             // continue the game as long as current player has any pieces left
             while (board.GetPlayersPieces(currentPlayer).Any())
             {
-                Console.WriteLine("\n\nPlayer turn: {0}", currentPlayer);
+                Console.WriteLine("\n\nTurn #{0} Player: {1}", pointer + 1, currentPlayer);
                 board.PrintBoard();
 
                 // get the list of pieces belonging to current player
@@ -609,9 +611,10 @@ namespace Checkers
                 }
             }
 
+            Console.WriteLine("\n\n{0} player won!", ChangeTurn(currentPlayer));
+
             // print the final state of the board once the game has ended
             board.PrintBoard();
-            Console.WriteLine("{0} player won", ChangeTurn(currentPlayer));
 
             // add states all subsequent states of the game to the list of previous games
             previousGames.Add(states);
